@@ -47,7 +47,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
       eliminatedAtRep: 0,
     })),
   }));
-  
+
   const intervalRef = useRef<number | null>(null);
   const lastBeepTimeRef = useRef<number>(-1);
   const startTimeRef = useRef<number>(0);
@@ -80,7 +80,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
 
   const startTest = useCallback(async () => {
     await AudioService.resume();
-    
+
     setState(prev => ({
       ...prev,
       isRunning: true,
@@ -91,23 +91,23 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
       currentSpeed: protocol.initialSpeed,
       currentDistance: protocol.initialDistance,
     }));
-    
+
     lastBeepTimeRef.current = -1;
     startTimeRef.current = Date.now();
-    
+
     // Initial beep
     AudioService.playStageBeep();
-    
+
     intervalRef.current = window.setInterval(() => {
       const elapsed = (Date.now() - startTimeRef.current) / 1000;
-      
+
       setState(prev => {
         if (!prev.isRunning || prev.isPaused) return prev;
-        
+
         const newElapsedTime = elapsed;
         const stageElapsedTime = newElapsedTime % protocol.stageDuration;
         const repElapsedTime = stageElapsedTime % protocol.repDuration;
-        
+
         // Calculate current rep (1-5) and phase (6s going, 6s returning, 6s recovery)
         const repInStage = Math.floor(stageElapsedTime / protocol.repDuration) + 1;
         let phase: 'going' | 'returning' | 'recovery';
@@ -118,12 +118,12 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
         } else {
           phase = 'recovery';
         }
-        
+
         // Check for beep timing (every 6 seconds)
         const totalSixSecondPeriods = Math.floor(newElapsedTime / 6);
         if (totalSixSecondPeriods > lastBeepTimeRef.current) {
           lastBeepTimeRef.current = totalSixSecondPeriods;
-          
+
           // Check if this is start of a new stage
           const currentStageFromTime = Math.floor(newElapsedTime / protocol.stageDuration) + 1;
           if (currentStageFromTime > prev.currentStage) {
@@ -132,10 +132,10 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
             AudioService.playBeep();
           }
         }
-        
+
         // Calculate current stage
         const currentStage = Math.floor(newElapsedTime / protocol.stageDuration) + 1;
-        
+
         return {
           ...prev,
           elapsedTime: newElapsedTime,
@@ -160,13 +160,13 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
 
   const recordFailure = useCallback((athleteId: string) => {
     AudioService.playFailBeep();
-    
+
     setState(prev => {
       const newAthleteStates = prev.athleteStates.map(as => {
         if (as.athleteId !== athleteId || as.isEliminated) return as;
-        
+
         const newFailures = as.consecutiveFailures + 1;
-        
+
         if (newFailures >= 2) {
           return {
             ...as,
@@ -176,17 +176,17 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
             eliminatedAtRep: prev.currentRep,
           };
         }
-        
+
         return { ...as, consecutiveFailures: newFailures };
       });
-      
+
       const allEliminated = newAthleteStates.every(as => as.isEliminated);
-      
+
       if (allEliminated) {
         clearTimer();
         return { ...prev, athleteStates: newAthleteStates, allEliminated: true, isRunning: false };
       }
-      
+
       return { ...prev, athleteStates: newAthleteStates };
     });
   }, [clearTimer]);
@@ -194,7 +194,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
   const resetFailures = useCallback((athleteId: string) => {
     setState(prev => ({
       ...prev,
-      athleteStates: prev.athleteStates.map(as => 
+      athleteStates: prev.athleteStates.map(as =>
         as.athleteId === athleteId ? { ...as, consecutiveFailures: 0 } : as
       ),
     }));
@@ -203,43 +203,54 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
   const endTest = useCallback((): { athleteResults: AthleteResult[]; totalTime: number } | null => {
     clearTimer();
     AudioService.playEndBeep();
-    
+
     const currentState = state;
-    
+
     if (!currentState.isStarted) {
       return null;
     }
-    
+
     const athleteResults: AthleteResult[] = currentState.athleteStates.map(as => {
+      // Se eliminado, usa os valores salvos. Se não (stop manual), usa o estágio/rep atual.
       const stage = as.isEliminated ? as.eliminatedAtStage : currentState.currentStage;
       const rep = as.isEliminated ? as.eliminatedAtRep : currentState.currentRep;
-      
-      // If eliminated, they didn't complete the current stage
-      const completedStages = as.isEliminated ? stage - 1 : stage - 1;
-      const completedRepsInLastStage = as.isEliminated ? rep : rep;
-      const isLastStageComplete = !as.isEliminated && 
-                                   currentState.currentRep === protocol.repsPerStage && 
-                                   currentState.currentPhase === 'recovery' &&
-                                   currentState.repElapsedTime >= 17;
-      
+
+      // Lógica de testes incompletos:
+      // Se parou no meio (seja por falha ou stop manual), o estágio atual NÃO conta como completo.
+      // Então stagesCompleted sempre será stage - 1.
+      const completedStages = Math.max(0, stage - 1);
+
+      // Repetições completas no estágio atual (último que participou)
+      const completedRepsInLastStage = rep;
+
+      // Verificação rigorosa para conclusão total do estágio
+      // Só é true se NÃO foi eliminado E completou todas as reps + tempo de recuperação final
+      const isLastStageComplete = !as.isEliminated &&
+        currentState.currentRep === protocol.repsPerStage &&
+        currentState.currentPhase === 'recovery' &&
+        currentState.repElapsedTime >= 17;
+
+      // Se completou o último estágio perfeitamente, incrementa o contador de estágios
+      const finalCompletedStages = isLastStageComplete ? stage : completedStages;
+
       const peakVelocity = CalculatorService.calculatePeakVelocity(
         protocol,
-        completedStages > 0 ? completedStages : 1,
+        Math.max(1, finalCompletedStages), // Garante min 1 para cálculo
         completedRepsInLastStage,
         isLastStageComplete
       );
-      
+
       const finalDistance = CalculatorService.calculateTotalDistance(
         protocol,
-        completedStages,
+        finalCompletedStages,
         completedRepsInLastStage,
         isLastStageComplete
       );
-      
+
       return {
         athleteId: as.athleteId,
         athleteName: as.athleteName,
-        completedStages: isLastStageComplete ? stage : completedStages,
+        completedStages: finalCompletedStages,
         completedRepsInLastStage,
         isLastStageComplete,
         peakVelocity,
@@ -247,7 +258,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
         eliminatedByFailure: as.isEliminated,
       };
     });
-    
+
     setState({
       ...INITIAL_STATE,
       currentSpeed: protocol.initialSpeed,
@@ -261,7 +272,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
         eliminatedAtRep: 0,
       })),
     });
-    
+
     return {
       athleteResults,
       totalTime: currentState.elapsedTime,
