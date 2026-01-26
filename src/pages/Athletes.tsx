@@ -1,0 +1,427 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, User, Trash2, Edit2, X, Check, ChevronDown, ChevronUp, ExternalLink, Loader2, Search } from 'lucide-react';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SupabaseService } from '@/services/SupabaseService';
+import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
+import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+interface Athlete {
+  id: string;
+  name: string;
+  sport: 'athletics' | 'cycling' | 'other' | null;
+  team: string | null;
+  position: string | null;
+  pvTcar?: number;
+}
+
+interface AthleteTest {
+  id: string;
+  peak_velocity: number;
+  tests: {
+    date: string;
+    protocol_level: number;
+  } | null;
+}
+
+export default function Athletes() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { t } = useTranslation();
+  const [athletes, setAthletes] = useState<Athlete[]>([]);
+  const [athleteTests, setAthleteTests] = useState<Record<string, AthleteTest[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [team, setTeam] = useState('');
+  const [position, setPosition] = useState('');
+  const [sport, setSport] = useState<'athletics' | 'cycling' | 'other'>('athletics');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [pvTcarFilter, setPvTcarFilter] = useState('');
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    loadAthletes();
+  }, [user, navigate]);
+
+  const loadAthletes = async () => {
+    try {
+      const data = await SupabaseService.getAthletes();
+      setAthletes(data.map((a: any) => ({
+        ...a,
+        pvTcar: a.pv_tcar
+      })) as Athlete[]);
+    } catch (error) {
+      console.error('Error loading athletes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAthleteTests = async (athleteId: string) => {
+    if (athleteTests[athleteId]) return;
+    try {
+      const tests = await SupabaseService.getAthleteTests(athleteId);
+      setAthleteTests(prev => ({ ...prev, [athleteId]: tests as unknown as AthleteTest[] }));
+    } catch (error) {
+      console.error('Error loading athlete tests:', error);
+    }
+  };
+
+  const handleExpand = async (athleteId: string) => {
+    if (expandedId === athleteId) {
+      setExpandedId(null);
+    } else {
+      setExpandedId(athleteId);
+      await loadAthleteTests(athleteId);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!name.trim()) return;
+    setSubmitting(true);
+
+    try {
+      if (editingId) {
+        await SupabaseService.updateAthlete(editingId, {
+          name: name.trim(),
+          team: team || null,
+          position: position || null,
+          sport
+        });
+      } else {
+        await SupabaseService.createAthlete({
+          name: name.trim(),
+          team: team || null,
+          position: position || null,
+          sport
+        });
+      }
+      await loadAthletes();
+      resetForm();
+    } catch (error) {
+      console.error('Error saving athlete:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleEdit = (athlete: Athlete) => {
+    setEditingId(athlete.id);
+    setName(athlete.name);
+    setTeam(athlete.team || '');
+    setPosition(athlete.position || '');
+    setSport(athlete.sport || 'athletics');
+    setShowForm(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await SupabaseService.deleteAthlete(deleteId);
+      setAthletes(athletes.filter(a => a.id !== deleteId));
+      setDeleteId(null);
+    } catch (error) {
+      console.error('Error deleting athlete:', error);
+    }
+  };
+
+  const resetForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setName('');
+    setTeam('');
+    setPosition('');
+    setSport('athletics');
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: '2-digit'
+    });
+  };
+
+  const getSportLabel = (s: string | null) => {
+    switch (s) {
+      case 'athletics': return t('athletics');
+      case 'cycling': return t('cycling');
+      default: return t('other');
+    }
+  };
+
+  if (loading) {
+    return (
+      <PageContainer title={t('athletesTitle')} showBack backTo="/">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </PageContainer>
+    );
+  }
+
+  return (
+    <PageContainer 
+      title={t('athletesTitle')} 
+      showBack 
+      backTo="/"
+      action={
+        !showForm && (
+          <Button size="sm" onClick={() => setShowForm(true)}>
+            <Plus className="w-4 h-4 mr-1" />
+            {t('new')}
+          </Button>
+        )
+      }
+    >
+      <div className="max-w-md mx-auto space-y-4">
+        {/* Add/Edit form */}
+        {showForm && (
+          <div className="glass-card p-4 rounded-xl animate-scale-in">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">
+                {editingId ? t('editAthlete') : t('newAthlete')}
+              </h3>
+              <Button variant="ghost" size="icon-sm" onClick={resetForm}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="space-y-3">
+              <Input
+                placeholder={`${t('name')} *`}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+              />
+              <Select value={sport} onValueChange={(v) => setSport(v as typeof sport)}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t('sport')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="athletics">{t('athletics')}</SelectItem>
+                  <SelectItem value="cycling">{t('cycling')}</SelectItem>
+                  <SelectItem value="other">{t('other')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder={`${t('team')} ${t('optional')}`}
+                value={team}
+                onChange={(e) => setTeam(e.target.value)}
+              />
+              <Input
+                placeholder={`${t('position')} ${t('optional')}`}
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+              />
+              <Button 
+                className="w-full" 
+                onClick={handleSubmit}
+                disabled={!name.trim() || submitting}
+              >
+                {submitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    {editingId ? t('save') : t('add')}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Search Bar */}
+        {athletes.length > 0 && !showForm && (
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder={t('search')}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 bg-background/50"
+              />
+            </div>
+            <Input
+              placeholder="PV-TCAR"
+              value={pvTcarFilter}
+              onChange={(e) => setPvTcarFilter(e.target.value)}
+              className="w-24 bg-background/50"
+              type="number"
+            />
+          </div>
+        )}
+
+        {/* Athletes list */}
+        {athletes.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 rounded-full bg-secondary mx-auto mb-4 flex items-center justify-center">
+              <User className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <p className="text-muted-foreground">{t('noAthletes')}</p>
+            {!showForm && (
+              <Button 
+                variant="outline" 
+                className="mt-4"
+                onClick={() => setShowForm(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {t('addAthlete')}
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {athletes
+              .filter(a => {
+                const matchesSearch = a.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                  (a.team && a.team.toLowerCase().includes(searchTerm.toLowerCase()));
+                const matchesPvTcar = !pvTcarFilter || (a.pvTcar && a.pvTcar.toString().startsWith(pvTcarFilter));
+                return matchesSearch && matchesPvTcar;
+              })
+              .map((athlete, index) => (
+              <div
+                key={athlete.id}
+                className="glass-card rounded-xl overflow-hidden animate-fade-in"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                {/* Card header */}
+                <div className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{athlete.name}</p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {getSportLabel(athlete.sport)}
+                      {athlete.position && ` • ${athlete.position}`}
+                      {athlete.pvTcar && ` • PV: ${athlete.pvTcar}`}
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => navigate(`/athlete/${athlete.id}`)}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleEdit(athlete)}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setDeleteId(athlete.id)}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Expand button */}
+                <button
+                  className="w-full p-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => handleExpand(athlete.id)}
+                >
+                  {expandedId === athlete.id ? (
+                    <>{t('collapse')} <ChevronUp className="w-4 h-4" /></>
+                  ) : (
+                    <>{t('viewTests')} <ChevronDown className="w-4 h-4" /></>
+                  )}
+                </button>
+
+                {/* Expanded content */}
+                {expandedId === athlete.id && (
+                  <div className="border-t border-border/50 p-4 bg-secondary/30">
+                    {!athleteTests[athlete.id] ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : athleteTests[athlete.id].length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        {t('noTests')}
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {athleteTests[athlete.id].slice(0, 5).map(test => (
+                          <div 
+                            key={test.id}
+                            className="flex items-center justify-between p-2 rounded bg-background/50"
+                          >
+                            <span className="text-sm text-muted-foreground">
+                              {test.tests ? formatDate(test.tests.date) : 'Data não disponível'}
+                            </span>
+                            <span className="font-mono font-bold text-primary">
+                              {Number(test.peak_velocity).toFixed(2)} km/h
+                            </span>
+                          </div>
+                        ))}
+                        {athleteTests[athlete.id].length > 5 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full"
+                            onClick={() => navigate(`/athlete/${athlete.id}`)}
+                          >
+                            {t('viewAll')} ({athleteTests[athlete.id].length})
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent className="glass-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('deleteAthleteTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('deleteAthleteDesc')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive">
+              {t('delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </PageContainer>
+  );
+}

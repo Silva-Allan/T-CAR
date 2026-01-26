@@ -1,0 +1,17 @@
+{
+  "name": "T-CAR - Teste de Carminatti",
+  "short_name": "T-CAR",
+  "description": "Aplicação para execução e gestão do Teste de Carminatti",
+  "theme_color": "#0c1117",
+  "background_color": "#0c1117",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}
