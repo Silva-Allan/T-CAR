@@ -42,10 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
+
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
+      email: email.trim(),
+      password: password.trim(),
       options: {
         emailRedirectTo: redirectUrl,
         data: {
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       title: 'Conta criada!',
       description: 'Você pode fazer login agora.'
     });
-    
+
     return { error: null };
   };
 
