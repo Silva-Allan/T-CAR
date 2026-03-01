@@ -10,6 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  resetPassword: (email: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -90,6 +91,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   };
 
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth?mode=reset`,
+    });
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao solicitar redefinição',
+        description: error.message
+      });
+      return { error };
+    }
+
+    toast({
+      title: 'E-mail enviado',
+      description: 'Verifique sua caixa de entrada para redefinir a senha.'
+    });
+
+    return { error: null };
+  };
+
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
@@ -107,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, isLoading, signUp, signIn, resetPassword, signOut }}>
       {children}
     </AuthContext.Provider>
   );

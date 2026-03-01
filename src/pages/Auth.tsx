@@ -8,13 +8,22 @@ import { cn } from '@/lib/utils';
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, isLoading, signIn, signUp } = useAuth();
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const { user, isLoading, signIn, signUp, resetPassword } = useAuth();
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('remembered_email');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (user && !isLoading) {
@@ -24,18 +33,36 @@ export default function Auth() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!email) return;
 
     setSubmitting(true);
 
-    if (mode === 'signup') {
+    if (mode === 'forgot') {
+      const { error } = await resetPassword(email);
+      if (!error) {
+        setMode('login');
+      }
+    } else if (mode === 'signup') {
+      if (!password) {
+        setSubmitting(false);
+        return;
+      }
       const { error } = await signUp(email, password, fullName);
       if (!error) {
         setMode('login');
       }
     } else {
+      if (!password) {
+        setSubmitting(false);
+        return;
+      }
       const { error } = await signIn(email, password);
       if (!error) {
+        if (rememberMe) {
+          localStorage.setItem('remembered_email', email);
+        } else {
+          localStorage.removeItem('remembered_email');
+        }
         navigate('/');
       }
     }
@@ -61,35 +88,37 @@ export default function Auth() {
           </div>
           <h1 className="text-2xl font-bold">T-CAR App</h1>
           <p className="text-muted-foreground">
-            {mode === 'login' ? 'Entre na sua conta' : 'Crie sua conta'}
+            {mode === 'login' ? 'Entre na sua conta' : mode === 'signup' ? 'Crie sua conta' : 'Recuperar senha'}
           </p>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 p-1 bg-secondary rounded-lg">
-          <button
-            className={cn(
-              "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all",
-              mode === 'login'
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setMode('login')}
-          >
-            Entrar
-          </button>
-          <button
-            className={cn(
-              "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all",
-              mode === 'signup'
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setMode('signup')}
-          >
-            Criar conta
-          </button>
-        </div>
+        {mode !== 'forgot' && (
+          <div className="flex gap-2 p-1 bg-secondary rounded-lg">
+            <button
+              className={cn(
+                "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all",
+                mode === 'login'
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => setMode('login')}
+            >
+              Entrar
+            </button>
+            <button
+              className={cn(
+                "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all",
+                mode === 'signup'
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => setMode('signup')}
+            >
+              Criar conta
+            </button>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -118,18 +147,51 @@ export default function Auth() {
             />
           </div>
 
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input
-              type="password"
-              placeholder="Senha"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pl-10"
-              required
-              minLength={6}
-            />
-          </div>
+          {mode !== 'forgot' && (
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type="password"
+                placeholder="Senha"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="pl-10"
+                required
+                minLength={6}
+              />
+            </div>
+          )}
+
+          {mode === 'login' && (
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                Lembrar de mim
+              </label>
+              <button
+                type="button"
+                onClick={() => setMode('forgot')}
+                className="text-xs text-primary hover:underline font-medium"
+              >
+                Esqueceu a senha?
+              </button>
+            </div>
+          )}
+
+          {mode === 'forgot' && (
+            <button
+              type="button"
+              onClick={() => setMode('login')}
+              className="text-xs text-primary hover:underline font-medium px-1"
+            >
+              Voltar ao login
+            </button>
+          )}
 
           {mode === 'signup' && (
             <div className="flex items-start space-x-2 py-2 animate-fade-in">
@@ -151,13 +213,13 @@ export default function Auth() {
             type="submit"
             className="w-full"
             size="lg"
-            disabled={submitting || !email || !password || (mode === 'signup' && !agreedToTerms)}
+            disabled={submitting || !email || (mode !== 'forgot' && !password) || (mode === 'signup' && !agreedToTerms)}
           >
             {submitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                {mode === 'login' ? 'Entrar' : 'Criar conta'}
+                {mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Enviar e-mail'}
                 <ArrowRight className="w-5 h-5 ml-2" />
               </>
             )}
