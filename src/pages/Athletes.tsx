@@ -51,7 +51,7 @@ export default function Athletes() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
-  const [gender, setGender] = useState('');
+  const [gender, setGender] = useState<string>('');
   const [team, setTeam] = useState('');
   const [position, setPosition] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -106,7 +106,7 @@ export default function Athletes() {
           name: name.trim(),
           email: email.trim() || null,
           birth_date: birthDate || null,
-          gender: gender || null,
+          gender: (gender as any) || null,
           team: team || null,
           position: position || null,
         });
@@ -115,7 +115,7 @@ export default function Athletes() {
           name: name.trim(),
           email: email.trim() || null,
           birth_date: birthDate || null,
-          gender: gender || null,
+          gender: (gender as any) || null,
           team: team || null,
           position: position || null,
         });
@@ -208,6 +208,16 @@ export default function Athletes() {
               </Button>
             </div>
 
+            <div className="mb-4 p-3 rounded-lg bg-primary/5 border border-primary/10 space-y-2">
+              <p className="text-[10px] leading-tight text-muted-foreground">
+                Ao cadastrar um atleta, voce atua como <strong>Controlador</strong> e declara possuir o consentimento para o tratamento de seus dados conforme a <strong>LGPD</strong>.
+              </p>
+              <div className="flex gap-2">
+                <a href="/privacy" target="_blank" className="text-[9px] font-bold text-primary hover:underline uppercase">Privacidade</a>
+                <a href="/terms" target="_blank" className="text-[9px] font-bold text-primary hover:underline uppercase">Termos</a>
+              </div>
+            </div>
+
             <div className="space-y-3">
               <Input
                 placeholder={`${t('name')} *`}
@@ -228,7 +238,7 @@ export default function Athletes() {
                   value={gender}
                   onChange={(e) => setGender(e.target.value)}
                 >
-                  <option value="">{t('gender')}...</option>
+                  <option value="">{t('gender')} ({t('optional')})</option>
                   <option value="M">Masculino</option>
                   <option value="F">Feminino</option>
                   <option value="Prefiro não dizer">Outro</option>

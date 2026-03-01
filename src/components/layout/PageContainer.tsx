@@ -71,7 +71,7 @@ export function PageContainer({
                   </h1>
                   {branded && (
                     <p className="text-[10px] text-white/60 font-medium tracking-wider uppercase">
-                      UDESC • Protocolo v3.0
+                      UDESC • Protocolo Oficial
                     </p>
                   )}
                 </div>

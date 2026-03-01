@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import {
   ExternalLink, Activity, BookOpen, Download, FileText, Star,
-  ChevronDown, ChevronUp, Play, Youtube, Info, Dumbbell, MapPin
+  ChevronDown, ChevronUp, Play, Youtube, Info, Dumbbell, MapPin,
+  GraduationCap, Building2, Handshake, Rocket
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 
@@ -60,7 +61,7 @@ export default function About() {
           <div className="flex justify-center gap-2 mt-4 flex-wrap">
             <span className="text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-primary/10 text-primary">UDESC</span>
             <span className="text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-primary/10 text-primary">CEFID</span>
-            <span className="text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-primary/10 text-primary">Protocolo Oficial v3.0</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-primary/10 text-primary">Protocolo Oficial</span>
           </div>
         </div>
 
@@ -69,7 +70,9 @@ export default function About() {
 
           {/* Prof. Lorival */}
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-xl">👨‍🔬</div>
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-primary">
+              <GraduationCap className="w-6 h-6" />
+            </div>
             <div>
               <p className="font-bold">Prof. Dr. Lorival José Carminatti</p>
               <p className="text-xs text-muted-foreground">Doutor em Ciências do Movimento Humano · UFSC</p>
@@ -85,7 +88,9 @@ export default function About() {
 
           {/* UDESC */}
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-xl">🏛️</div>
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-primary">
+              <Building2 className="w-6 h-6" />
+            </div>
             <div>
               <p className="font-bold">UDESC — CEFID</p>
               <p className="text-xs text-muted-foreground">Universidade do Estado de Santa Catarina</p>
@@ -101,7 +106,9 @@ export default function About() {
 
           {/* Parceria */}
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-xl">🤝</div>
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 text-primary">
+              <Handshake className="w-6 h-6" />
+            </div>
             <div>
               <p className="font-bold">Plataforma Digital Oficial</p>
               <p className="text-xs text-muted-foreground">Parceria Prof. Carminatti × Desenvolvedor</p>
@@ -405,7 +412,9 @@ export default function About() {
 
           {/* PRO callout */}
           <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
-            <p className="text-sm font-semibold text-primary mb-1">🚀 Em breve — Versão PRO</p>
+            <p className="text-sm font-semibold text-primary mb-1 flex items-center gap-2">
+              <Rocket className="w-4 h-4" /> Em breve — Versão PRO
+            </p>
             <p className="text-xs text-muted-foreground leading-relaxed">
               Operacionalização e prescrição automática do TIAI individualizado com base no PV-TCAR de cada atleta.
             </p>
@@ -440,8 +449,12 @@ export default function About() {
             Todos os direitos reservados ao desenvolvedor do T-CAR
           </p>
           <p className="text-[10px] text-muted-foreground/50 mt-2">
-            T-CAR App Professional v3.0
+            T-CAR App
           </p>
+          <div className="flex justify-center gap-4 mt-4">
+            <a href="/privacy" className="text-[10px] font-bold text-primary hover:underline uppercase tracking-tighter">Política de Privacidade</a>
+            <a href="/terms" className="text-[10px] font-bold text-primary hover:underline uppercase tracking-tighter">Termos de Uso</a>
+          </div>
         </div>
 
       </div>

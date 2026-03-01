@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { IndexedDBService } from '@/services/IndexedDBService';
 
 interface AuthContextType {
   user: User | null;
@@ -90,11 +91,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    toast({
-      title: 'Logout realizado',
-      description: 'Até logo!'
-    });
+    try {
+      await supabase.auth.signOut();
+      // Secure Wipe LGPD
+      await IndexedDBService.clearAllData();
+      localStorage.clear();
+
+      toast({
+        title: 'Logout realizado',
+        description: 'Sessao e dados locais limpos com segurança.'
+      });
+    } catch (e) {
+      console.error('Erro ao deslogar:', e);
+    }
   };
 
   return (

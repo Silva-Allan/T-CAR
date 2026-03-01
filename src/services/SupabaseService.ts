@@ -45,8 +45,11 @@ class SupabaseServiceClass {
 
     const { data, error } = await supabase
       .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
+      .upsert({
+        id: user.id,          // required for conflict resolution
+        email: user.email,    // keep email in sync
+        ...updates,
+      }, { onConflict: 'id' })
       .select()
       .single();
 
@@ -421,6 +424,47 @@ class SupabaseServiceClass {
     }
 
     return Array.from(latestByAthlete.values());
+  }
+
+  /**
+   * Exporta todos os dados do usuário para portabilidade (LGPD).
+   */
+  async exportAllUserData(): Promise<any> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Não autenticado');
+
+    const profile = await this.getProfile();
+    const athletes = await this.getAthletes();
+    const tests = await this.getTests();
+
+    return {
+      export_date: new Date().toISOString(),
+      user: {
+        id: user.id,
+        email: user.email,
+        profile
+      },
+      athletes,
+      tests
+    };
+  }
+
+  /**
+   * Exclui todos os dados do usuário (Direito ao Esquecimento - LGPD).
+   * Nota: Isso limpa as tabelas públicas. A conta auth.users permanece 
+   * (embora vazia) pois deletar o user requer service_role.
+   */
+  async deleteAllUserData(): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Não autenticado');
+
+    // O cascade no schema deve cuidar disso, mas vamos garantir as tabelas principais
+    await supabase.from('test_results').delete().filter('test_id', 'in',
+      supabase.from('tests').select('id').eq('user_id', user.id)
+    );
+    await supabase.from('athletes').delete().eq('user_id', user.id);
+    await supabase.from('tests').delete().eq('user_id', user.id);
+    await supabase.from('profiles').delete().eq('id', user.id);
   }
 }
 

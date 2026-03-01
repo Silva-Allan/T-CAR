@@ -207,6 +207,24 @@ class IndexedDBServiceClass {
             request.onerror = () => reject(request.error);
         });
     }
+
+    /**
+     * Limpa completamente o banco de dados (Secure Wipe).
+     */
+    async clearAllData(): Promise<void> {
+        const db = await this.ensureDB();
+        const storeNames = Array.from(db.objectStoreNames);
+        if (storeNames.length === 0) return;
+
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(storeNames, 'readwrite');
+            storeNames.forEach(name => {
+                tx.objectStore(name).clear();
+            });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
 }
 
 export const IndexedDBService = new IndexedDBServiceClass();

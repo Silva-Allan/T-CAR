@@ -59,7 +59,7 @@ export default function Index() {
             <div>
               <h1 className="text-lg font-black text-white tracking-tight">T-CAR</h1>
               <p className="text-[10px] text-white/50 font-semibold tracking-[0.2em] uppercase">
-                UDESC • Protocolo v3.0
+                UDESC • Protocolo Oficial
               </p>
             </div>
           </div>
@@ -131,7 +131,7 @@ export default function Index() {
       {/* Footer */}
       <footer className="pb-6 text-center">
         <p className="text-[10px] text-muted-foreground/40 font-medium tracking-wider uppercase">
-          T-CAR Professional v3.0
+          T-CAR App
         </p>
       </footer>
     </div>

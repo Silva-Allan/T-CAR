@@ -1,163 +1,275 @@
 // ======================================================================
-// T-CAR 2.0 — Export Service
+// T-CAR 2.0 — Export Service (Design Aprimorado)
 // ======================================================================
-// Exportação de dados em PDF profissional.
-// Conteúdo: dados do teste, histórico do atleta, ranking do grupo.
+// Exportação de dados em PDF profissional com layout modernizado.
+// Destaque para: T-CAR, nome do atleta, clube/equipe e data do PDF.
 // ======================================================================
 
 import { AthleteResult } from '@/models/types';
 
-// Cores UDESC
+// Cores UDESC (mantidas)
 const UDESC_GREEN = [0, 102, 51] as const;       // #006633
 const UDESC_DARK = [0, 51, 25] as const;          // #003319
 const ACCENT_RED = [200, 16, 46] as const;        // #C8102E
 const TEXT_PRIMARY = [30, 30, 30] as const;
 const TEXT_SECONDARY = [120, 120, 120] as const;
+const TEXT_LIGHT = [255, 255, 255] as const;
 const TABLE_HEADER_BG = [0, 102, 51] as const;
 const TABLE_ROW_ALT = [240, 245, 240] as const;
 const TABLE_BORDER = [200, 210, 200] as const;
+const BG_LIGHT = [248, 250, 248] as const;
 
 class ExportServiceClass {
 
     // ====================================================================
-    // PDF Helpers — Branded Header, Tables, Charts
+    // PDF Helpers — Design Aprimorado
     // ====================================================================
 
-    private drawHeader(doc: any, title: string, subtitle: string) {
+    private drawEnhancedHeader(doc: any, title: string, athleteName?: string, team?: string): number {
         const pageW = doc.internal.pageSize.getWidth();
+        const headerHeight = 50;
+        const currentDate = new Date().toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
 
-        // Green header band
+        // Fundo principal com gradiente visual (faixas)
         doc.setFillColor(...UDESC_GREEN);
-        doc.rect(0, 0, pageW, 38, 'F');
+        doc.rect(0, 0, pageW, headerHeight, 'F');
 
-        // Gradient effect (darker strip at top)
+        // Faixa superior mais escura
         doc.setFillColor(...UDESC_DARK);
-        doc.rect(0, 0, pageW, 4, 'F');
+        doc.rect(0, 0, pageW, 6, 'F');
 
-        // T-CAR title
-        doc.setFontSize(22);
-        doc.setTextColor(255, 255, 255);
+        // LOGOTIPO T-CAR (esquerda)
+        doc.setFontSize(28);
         doc.setFont('helvetica', 'bold');
-        doc.text('T-CAR', 15, 18);
+        doc.setTextColor(...TEXT_LIGHT);
+        doc.text('T-CAR', 15, 22);
 
-        // Subtitle badge
-        doc.setFontSize(8);
+        // Slogan ou versão (pequeno abaixo do logo)
+        doc.setFontSize(7);
         doc.setFont('helvetica', 'normal');
-        doc.text('UDESC • PROTOCOLO V3.0', 15, 26);
+        doc.setTextColor(200, 230, 200);
+        doc.text('T-CAR App • UDESC', 15, 32);
 
-        // Report title on the right
-        doc.setFontSize(14);
+        // NOME DO ATLETA (centralizado, destaque)
+        if (athleteName) {
+            doc.setFontSize(18);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...TEXT_LIGHT);
+
+            // Centraliza o nome do atleta
+            const nameWidth = doc.getTextWidth(athleteName);
+            const centerX = (pageW - nameWidth) / 2;
+            doc.text(athleteName, centerX, 22);
+
+            // CLUBE/EQUIPE abaixo do nome do atleta
+            if (team) {
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(220, 240, 220);
+                const teamWidth = doc.getTextWidth(team);
+                const teamCenterX = (pageW - teamWidth) / 2;
+                doc.text(team, teamCenterX, 35);
+            }
+        }
+
+        // DATA DO PDF (direita)
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
-        doc.text(title, pageW - 15, 18, { align: 'right' });
+        doc.setTextColor(...TEXT_LIGHT);
+        doc.text(currentDate, pageW - 15, 18, { align: 'right' });
 
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.text(subtitle, pageW - 15, 26, { align: 'right' });
+        // Título do relatório (abaixo da data)
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(220, 240, 220);
+        doc.text(title, pageW - 15, 32, { align: 'right' });
 
-        return 48; // Y position after header
+        // Linha decorativa inferior (ajustada para evitar setGlobalAlpha que quebra em algumas versões)
+        doc.setDrawColor(180, 220, 180); // Verde claro para simular transparência sobre o fundo verde
+        doc.setLineWidth(0.3);
+        doc.line(15, headerHeight - 8, pageW - 15, headerHeight - 8);
+
+        return headerHeight + 10; // Y position after header
     }
 
-    private drawInfoBox(doc: any, y: number, items: { label: string; value: string }[], columns = 2): number {
+    private drawModernInfoBox(doc: any, y: number, items: { label: string; value: string }[], columns = 3): number {
         const pageW = doc.internal.pageSize.getWidth();
         const boxW = pageW - 30;
         const colW = boxW / columns;
-        const lineH = 7;
+        const lineH = 8;
         const rows = Math.ceil(items.length / columns);
-        const boxH = rows * lineH + 10;
+        const boxH = rows * lineH + 15;
 
-        // Box background
-        doc.setFillColor(248, 250, 248);
+        // Box com sombra simulada (borda dupla)
+        doc.setFillColor(...BG_LIGHT);
         doc.setDrawColor(...TABLE_BORDER);
         doc.setLineWidth(0.3);
-        doc.roundedRect(15, y, boxW, boxH, 3, 3, 'FD');
+        doc.roundedRect(15, y, boxW, boxH, 4, 4, 'FD');
 
-        // Left green accent
+        // Barra lateral verde (identidade visual)
         doc.setFillColor(...UDESC_GREEN);
-        doc.rect(15, y, 3, boxH, 'F');
+        doc.roundedRect(15, y, 4, boxH, 2, 2, 'F');
 
-        doc.setFontSize(8);
+        // Grid de informações
+        doc.setFontSize(8.5);
         items.forEach((item, i) => {
             const col = i % columns;
             const row = Math.floor(i / columns);
-            const x = 25 + col * colW;
-            const itemY = y + 8 + row * lineH;
+            const x = 28 + col * colW;
+            const itemY = y + 10 + row * lineH;
 
+            // Label
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(...TEXT_SECONDARY);
-            doc.text(item.label.toUpperCase(), x, itemY);
+            doc.text(item.label, x, itemY);
 
+            // Value
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...TEXT_PRIMARY);
-            doc.text(item.value, x + doc.getTextWidth(item.label.toUpperCase() + '  '), itemY);
+            const labelWidth = doc.getTextWidth(item.label + '  ');
+            doc.text(item.value, x + labelWidth, itemY);
         });
 
-        return y + boxH + 8;
+        return y + boxH + 10;
     }
 
-    private drawSectionTitle(doc: any, y: number, title: string, icon?: string): number {
-        doc.setFontSize(11);
+    private drawSectionTitleModern(doc: any, y: number, title: string, icon?: string): number {
+        // Título com ícone
+        doc.setFontSize(13);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(...UDESC_GREEN);
+
         const text = icon ? `${icon}  ${title}` : title;
         doc.text(text, 15, y);
 
-        // Underline
+        // Linha dupla decorativa
         doc.setDrawColor(...UDESC_GREEN);
         doc.setLineWidth(0.5);
         doc.line(15, y + 2, 15 + doc.getTextWidth(text), y + 2);
 
-        return y + 10;
+        doc.setDrawColor(...TABLE_BORDER);
+        doc.setLineWidth(0.2);
+        doc.line(15 + doc.getTextWidth(text) + 5, y + 2, doc.internal.pageSize.getWidth() - 15, y + 2);
+
+        return y + 12;
     }
 
-    private drawTable(
+    private drawMetricCard(doc: any, y: number, metrics: { label: string; value: string; color?: readonly [number, number, number]; icon?: string }[]): number {
+        const pageW = doc.internal.pageSize.getWidth();
+        const cardW = (pageW - 30 - (metrics.length - 1) * 8) / metrics.length;
+        const cardH = 35;
+
+        metrics.forEach((metric, i) => {
+            const x = 15 + i * (cardW + 8);
+
+            // Card com efeito elevado
+            doc.setFillColor(255, 255, 255);
+            doc.setDrawColor(...TABLE_BORDER);
+            doc.setLineWidth(0.3);
+            doc.roundedRect(x, y, cardW, cardH, 5, 5, 'FD');
+
+            // Barra superior colorida
+            const color = metric.color || UDESC_GREEN;
+            doc.setFillColor(...color);
+            doc.roundedRect(x, y, cardW, 4, 2, 2, 'F');
+
+            // Ícone opcional
+            if (metric.icon) {
+                doc.setFontSize(12);
+                doc.setTextColor(...color);
+                doc.text(metric.icon, x + 8, y + 16);
+            }
+
+            // Valor (grande)
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...color);
+
+            const valueX = metric.icon ? x + 22 : x + cardW / 2;
+            const valueAlign: 'left' | 'center' = metric.icon ? 'left' : 'center';
+
+            if (metric.icon) {
+                doc.text(metric.value, valueX, y + 18);
+            } else {
+                doc.text(metric.value, valueX, y + 18, { align: 'center' });
+            }
+
+            // Label
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...TEXT_SECONDARY);
+
+            const labelX = metric.icon ? x + 22 : x + cardW / 2;
+            doc.text(metric.label.toUpperCase(), labelX, y + 27, { align: valueAlign });
+        });
+
+        return y + cardH + 12;
+    }
+
+    private drawEnhancedTable(
         doc: any,
         y: number,
         headers: string[],
         colWidths: number[],
         rows: string[][],
-        options: { highlightFirst?: boolean; } = {}
+        options: { highlightFirst?: boolean; title?: string } = {}
     ): number {
         const startX = 15;
-        const rowH = 7;
-        const headerH = 8;
+        const rowH = 8;
+        const headerH = 10;
 
-        // Header row
+        // Título opcional da tabela
+        if (options.title) {
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...UDESC_GREEN);
+            doc.text(options.title, startX, y - 3);
+        }
+
+        // Header com gradiente visual
         doc.setFillColor(...TABLE_HEADER_BG);
-        doc.rect(startX, y, colWidths.reduce((a, b) => a + b, 0), headerH, 'F');
+        doc.roundedRect(startX, y, colWidths.reduce((a, b) => a + b, 0), headerH, 3, 3, 'F');
 
-        doc.setFontSize(7);
+        doc.setFontSize(7.5);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(255, 255, 255);
-        let x = startX + 2;
+
+        let x = startX + 4;
         headers.forEach((h, i) => {
-            doc.text(h, x, y + 5.5);
+            doc.text(h, x, y + 7);
             x += colWidths[i];
         });
-        y += headerH;
+
+        y += headerH + 2;
 
         // Data rows
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
+        doc.setFontSize(8);
 
         rows.forEach((row, rowIdx) => {
             // Page break check
-            if (y > 270) {
+            if (y > 260) {
                 doc.addPage();
-                y = 20;
-                // Redraw header on new page
+                y = 30;
+
+                // Redraw header
                 doc.setFillColor(...TABLE_HEADER_BG);
-                doc.rect(startX, y, colWidths.reduce((a, b) => a + b, 0), headerH, 'F');
-                doc.setFontSize(7);
+                doc.roundedRect(startX, y, colWidths.reduce((a, b) => a + b, 0), headerH, 3, 3, 'F');
+                doc.setFontSize(7.5);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(255, 255, 255);
-                let hx = startX + 2;
+                let hx = startX + 4;
                 headers.forEach((h, i) => {
-                    doc.text(h, hx, y + 5.5);
+                    doc.text(h, hx, y + 7);
                     hx += colWidths[i];
                 });
-                y += headerH;
+                y += headerH + 2;
                 doc.setFont('helvetica', 'normal');
-                doc.setFontSize(7.5);
+                doc.setFontSize(8);
             }
 
             // Alternating row background
@@ -166,211 +278,200 @@ class ExportServiceClass {
                 doc.rect(startX, y, colWidths.reduce((a, b) => a + b, 0), rowH, 'F');
             }
 
-            // Highlight top 3
-            if (options.highlightFirst && rowIdx < 3) {
-                const medals = ['🥇', '🥈', '🥉'];
-                doc.setTextColor(...UDESC_GREEN);
-                doc.setFont('helvetica', 'bold');
+            // Highlight top positions
+            if (options.highlightFirst) {
+                if (rowIdx === 0) {
+                    doc.setTextColor(...UDESC_GREEN);
+                    doc.setFont('helvetica', 'bold');
+                } else if (rowIdx === 1 || rowIdx === 2) {
+                    doc.setTextColor(...TEXT_PRIMARY);
+                    doc.setFont('helvetica', 'normal');
+                } else {
+                    doc.setTextColor(...TEXT_SECONDARY);
+                    doc.setFont('helvetica', 'normal');
+                }
             } else {
                 doc.setTextColor(...TEXT_PRIMARY);
                 doc.setFont('helvetica', 'normal');
             }
 
-            let rx = startX + 2;
+            let rx = startX + 4;
             row.forEach((cell, i) => {
-                doc.text(cell, rx, y + 5);
+                doc.text(cell, rx, y + 5.5);
                 rx += colWidths[i];
             });
-
-            // Reset text style
-            doc.setTextColor(...TEXT_PRIMARY);
-            doc.setFont('helvetica', 'normal');
 
             y += rowH;
         });
 
-        // Bottom border
-        doc.setDrawColor(...TABLE_BORDER);
-        doc.setLineWidth(0.3);
-        const totalW = colWidths.reduce((a, b) => a + b, 0);
-        doc.line(startX, y, startX + totalW, y);
-
         return y + 5;
     }
 
-    private drawStatCards(doc: any, y: number, stats: { label: string; value: string; color?: readonly [number, number, number] }[]): number {
+    private drawChartWithFrame(doc: any, y: number, chartImage: string | null, label: string): number {
+        if (!chartImage) return y;
+
         const pageW = doc.internal.pageSize.getWidth();
-        const cardW = (pageW - 30 - (stats.length - 1) * 5) / stats.length;
-        const cardH = 22;
+        const chartW = pageW - 30;
 
-        stats.forEach((stat, i) => {
-            const x = 15 + i * (cardW + 5);
+        let chartH = 75;
+        try {
+            const props = doc.getImageProperties(chartImage);
+            if (props?.width && props?.height) {
+                const aspectRatio = props.width / props.height;
+                chartH = Math.min(chartW / aspectRatio, 100);
+            }
+        } catch {
+            // use default 
+        }
 
-            // Card background
-            doc.setFillColor(248, 250, 248);
-            doc.setDrawColor(...TABLE_BORDER);
-            doc.setLineWidth(0.3);
-            doc.roundedRect(x, y, cardW, cardH, 2, 2, 'FD');
+        // Page break check
+        if (y + chartH + 25 > 270) {
+            doc.addPage();
+            y = 30;
+        }
 
-            // Top accent
-            const color = stat.color || UDESC_GREEN;
-            doc.setFillColor(...color);
-            doc.rect(x, y, cardW, 3, 'F');
+        y = this.drawSectionTitleModern(doc, y, label);
 
-            // Value
-            doc.setFontSize(14);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(...(stat.color || UDESC_GREEN));
-            doc.text(stat.value, x + cardW / 2, y + 13, { align: 'center' });
+        // Frame com sombra
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(...TABLE_BORDER);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(15, y, chartW, chartH, 5, 5, 'FD');
 
-            // Label
-            doc.setFontSize(6);
-            doc.setFont('helvetica', 'normal');
+        try {
+            if (chartImage) {
+                doc.addImage(chartImage, 'PNG', 17, y + 2, chartW - 4, chartH - 4);
+            }
+        } catch (e) {
+            doc.setFontSize(9);
             doc.setTextColor(...TEXT_SECONDARY);
-            doc.text(stat.label.toUpperCase(), x + cardW / 2, y + 19, { align: 'center' });
-        });
+            doc.text('Grafico nao disponivel', 15 + chartW / 2, y + chartH / 2, { align: 'center' });
+        }
 
-        return y + cardH + 8;
+        return y + chartH + 15;
     }
 
-    private drawFooter(doc: any) {
+    private drawEnhancedFooter(doc: any) {
         const pageCount = doc.internal.getNumberOfPages();
+        const currentDate = new Date().toLocaleDateString('pt-BR');
+        const currentTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
             const pageW = doc.internal.pageSize.getWidth();
 
-            // Footer line
+            // Linha decorativa
             doc.setDrawColor(...TABLE_BORDER);
             doc.setLineWidth(0.3);
-            doc.line(15, 283, pageW - 15, 283);
+            doc.line(15, 280, pageW - 15, 280);
 
-            doc.setFontSize(6);
+            // Logo texto
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...UDESC_GREEN);
+            doc.text('T-CAR', 15, 287);
+
+            // Info central
+            doc.setFont('helvetica', 'normal');
             doc.setTextColor(...TEXT_SECONDARY);
+            doc.text('T-CAR App - UDESC - Test de Course avec Acceleration et Recuperation', 15, 292);
+
+            // Data e página
             doc.setFont('helvetica', 'normal');
             doc.text(
-                'T-CAR Professional v3.0 • UDESC • Test de Course avec Accélération et Récupération',
-                15, 288
-            );
-            doc.text(
-                `Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • Página ${i}/${pageCount}`,
-                pageW - 15, 288, { align: 'right' }
+                `Pagina ${i}/${pageCount}  |  ${currentTime}  |  ${currentDate}`,
+                pageW - 15, 287, { align: 'right' }
             );
         }
     }
 
-    /**
-     * Inserts a chart image (from canvas.toDataURL) into the PDF.
-     */
-    private drawChartImage(doc: any, y: number, chartImage: string | null, label: string): number {
-        if (!chartImage) return y;
-
-        // Check page break
-        if (y + 75 > 270) {
-            doc.addPage();
-            y = 20;
-        }
-
-        y = this.drawSectionTitle(doc, y, label);
-
-        // Chart border
-        const pageW = doc.internal.pageSize.getWidth();
-        const chartW = pageW - 30;
-        const chartH = 60;
-        doc.setDrawColor(...TABLE_BORDER);
-        doc.setLineWidth(0.3);
-        doc.setFillColor(255, 255, 255);
-        doc.roundedRect(15, y, chartW, chartH, 2, 2, 'FD');
-
-        try {
-            doc.addImage(chartImage, 'PNG', 16, y + 1, chartW - 2, chartH - 2);
-        } catch (e) {
-            doc.setFontSize(8);
-            doc.setTextColor(...TEXT_SECONDARY);
-            doc.text('Gráfico não disponível', 15 + chartW / 2, y + chartH / 2, { align: 'center' });
-        }
-
-        return y + chartH + 10;
-    }
-
     // ====================================================================
-    // PDF Export Methods
+    // PDF Export Methods (Atualizados)
     // ====================================================================
 
-    /**
-     * Gera PDF profissional com relatório de um teste.
-     */
     async exportTestResultsToPDF(
         protocolLevel: number,
         totalTime: number,
         date: string,
         athleteResults: AthleteResult[],
-        options?: { temperature?: number | null; notes?: string; chartImage?: string | null }
+        options?: { temperature?: number | null; notes?: string; chartImage?: string | null; team?: string | null }
     ): Promise<void> {
         try {
             const { default: jsPDF } = await import('jspdf');
             const doc = new jsPDF();
 
-            // Header
-            let y = this.drawHeader(doc, 'Relatório de Teste', `Sessão ${new Date(date).toLocaleDateString('pt-BR')}`);
+            // Header aprimorado
+            let y = this.drawEnhancedHeader(doc, 'Relatorio de Teste', undefined, options?.team ?? undefined);
 
-            // Info Box
+            // Info Box moderno
             const infoItems = [
-                { label: 'Data:', value: new Date(date).toLocaleDateString('pt-BR') },
-                { label: 'Horário:', value: new Date(date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) },
-                { label: 'Protocolo:', value: `Nível ${protocolLevel}` },
+                { label: 'Data do Teste:', value: new Date(date.includes('T') ? date : `${date}T12:00:00`).toLocaleDateString('pt-BR') },
+                { label: 'Horário:', value: new Date(date.includes('T') ? date : `${date}T12:00:00`).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) },
+                { label: 'Protocolo:', value: `Nivel ${protocolLevel}` },
                 { label: 'Tempo Total:', value: this.formatTime(totalTime) },
                 { label: 'Atletas:', value: `${athleteResults.length}` },
-                { label: 'Temperatura:', value: options?.temperature ? `${options.temperature}°C` : 'N/I' },
+                { label: 'Temperatura:', value: options?.temperature ? `${options.temperature}C` : 'N/I' },
             ];
-            if (options?.notes) {
-                infoItems.push({ label: 'Observações:', value: options.notes });
-            }
-            y = this.drawInfoBox(doc, y, infoItems, 2);
 
-            // Stat Cards
+            if (options?.team && !athleteResults.length) {
+                infoItems.push({ label: 'Equipe:', value: options.team });
+            }
+
+            if (options?.notes) {
+                infoItems.push({ label: 'Observacoes:', value: options.notes.substring(0, 30) + (options.notes.length > 30 ? '...' : '') });
+            }
+
+            y = this.drawModernInfoBox(doc, y, infoItems, 3);
+
+            // Stat Cards aprimorados
             const pvValues = athleteResults.map(ar => ar.pvCorrigido);
             const bestPV = pvValues.length > 0 ? Math.max(...pvValues) : 0;
             const avgPV = pvValues.length > 0 ? pvValues.reduce((a, b) => a + b, 0) / pvValues.length : 0;
             const worstPV = pvValues.length > 0 ? Math.min(...pvValues) : 0;
 
-            y = this.drawStatCards(doc, y, [
+            y = this.drawMetricCard(doc, y, [
                 { label: 'Melhor PV', value: bestPV.toFixed(2), color: UDESC_GREEN },
-                { label: 'Média PV', value: avgPV.toFixed(2) },
+                { label: 'Media PV', value: avgPV.toFixed(2), color: UDESC_GREEN },
                 { label: 'Menor PV', value: worstPV.toFixed(2), color: ACCENT_RED },
-                { label: 'Atletas', value: `${athleteResults.length}` },
+                { label: 'Total Atletas', value: `${athleteResults.length}`, color: UDESC_GREEN },
             ]);
 
             // Chart
             if (options?.chartImage) {
-                y = this.drawChartImage(doc, y, options.chartImage, 'Distribuição de PV Corrigido');
+                y = this.drawChartWithFrame(doc, y, options.chartImage, 'Distribuição de PV Corrigido');
             }
 
-            // Results Table
-            y = this.drawSectionTitle(doc, y, 'Resultados Individuais');
+            // Enhanced Table
+            y = this.drawSectionTitleModern(doc, y, 'Resultados Individuais');
 
-            const headers = ['#', 'Atleta', 'PV Corr.', 'PV Bruto', 'FC', 'Estágios', 'Reps', 'Dist. (m)', 'Status'];
-            const colWidths = [10, 40, 22, 22, 18, 18, 15, 20, 15];
+            const headers = ['#', 'Atleta', 'PV Corr.', 'PV Bruto', 'FC', 'Estagios', 'Reps', 'Distancia', 'Status'];
+            const colWidths = [8, 38, 20, 20, 18, 16, 14, 18, 13];
+
             const rows = athleteResults
                 .sort((a, b) => b.pvCorrigido - a.pvCorrigido)
                 .map((ar, i) => {
                     const fc = ar.fcFinal != null ? `${ar.fcFinal}` : (ar.fcEstimada != null ? `~${ar.fcEstimada}` : '-');
+                    const statusSymbol = ar.eliminatedByFailure ? 'Elim.' : 'OK';
                     return [
                         `${i + 1}`,
-                        ar.athleteName.substring(0, 18),
+                        ar.athleteName.substring(0, 16),
                         ar.pvCorrigido.toFixed(2),
                         ar.pvBruto.toFixed(2),
                         fc,
                         `${ar.completedStages}`,
                         `${ar.totalReps}`,
                         `${ar.finalDistance}`,
-                        ar.eliminatedByFailure ? 'Elim.' : 'OK',
+                        statusSymbol,
                     ];
                 });
 
-            y = this.drawTable(doc, y, headers, colWidths, rows, { highlightFirst: true });
+            y = this.drawEnhancedTable(doc, y, headers, colWidths, rows, {
+                highlightFirst: true,
+                title: 'Ranking por PV Corrigido'
+            });
 
             // Footer
-            this.drawFooter(doc);
+            this.drawEnhancedFooter(doc);
 
             const fileName = `tcar_teste_${new Date(date).toISOString().split('T')[0]}.pdf`;
             doc.save(fileName);
@@ -380,9 +481,6 @@ class ExportServiceClass {
         }
     }
 
-    /**
-     * Gera PDF profissional com histórico de testes de um atleta.
-     */
     async exportAthleteHistoryToPDF(
         athleteName: string,
         tests: {
@@ -396,14 +494,19 @@ class ExportServiceClass {
             completedStages?: number;
             finalDistance?: number;
         }[],
-        options?: { chartImage?: string | null }
+        options?: {
+            chartImage?: string | null;
+            team?: string | null;
+            classification?: { label: string; percentile: number; color: string } | null;
+            lastTestDate?: string | null;
+        }
     ): Promise<void> {
         try {
             const { default: jsPDF } = await import('jspdf');
             const doc = new jsPDF();
 
-            // Header
-            let y = this.drawHeader(doc, 'Histórico do Atleta', athleteName);
+            // Header com nome do atleta e equipe em destaque
+            let y = this.drawEnhancedHeader(doc, 'Historico do Atleta', athleteName, options?.team ?? undefined);
 
             // Info Box
             const pvValues = tests.map(t => t.pvCorrigido);
@@ -411,35 +514,93 @@ class ExportServiceClass {
             const worst = pvValues.length > 0 ? Math.min(...pvValues) : 0;
             const avg = pvValues.length > 0 ? pvValues.reduce((a, b) => a + b, 0) / pvValues.length : 0;
 
-            y = this.drawInfoBox(doc, y, [
-                { label: 'Atleta:', value: athleteName },
+            const firstTest = tests.length > 0 ? tests[tests.length - 1] : null;
+            const lastTest = tests.length > 0 ? tests[0] : null;
+
+            y = this.drawModernInfoBox(doc, y, [
                 { label: 'Total de Testes:', value: `${tests.length}` },
-                { label: 'Data do Relatório:', value: new Date().toLocaleDateString('pt-BR') },
                 {
-                    label: 'Período:', value: tests.length > 0
-                        ? `${new Date(tests[tests.length - 1].date).toLocaleDateString('pt-BR')} a ${new Date(tests[0].date).toLocaleDateString('pt-BR')}`
+                    label: 'Periodo:', value: tests.length > 0
+                        ? `${new Date(firstTest!.date).toLocaleDateString('pt-BR')} - ${new Date(lastTest!.date).toLocaleDateString('pt-BR')}`
                         : 'N/A'
                 },
-            ], 2);
+                { label: 'Melhor PV:', value: best.toFixed(2) },
+                { label: 'Media PV:', value: avg.toFixed(2) },
+                { label: 'Menor PV:', value: worst.toFixed(2) },
+                {
+                    label: 'Evolucao:', value: tests.length > 1
+                        ? (pvValues[0] - pvValues[pvValues.length - 1] > 0 ? '+' : '') + (pvValues[0] - pvValues[pvValues.length - 1]).toFixed(2)
+                        : 'N/A'
+                },
+            ], 3);
 
-            // Stat Cards
-            y = this.drawStatCards(doc, y, [
+            // Metric Cards
+            y = this.drawMetricCard(doc, y, [
                 { label: 'Melhor PV', value: best.toFixed(2), color: UDESC_GREEN },
-                { label: 'Média PV', value: avg.toFixed(2) },
-                { label: 'Menor PV', value: worst.toFixed(2), color: ACCENT_RED },
-                { label: 'Testes', value: `${tests.length}` },
+                { label: 'Media PV', value: avg.toFixed(2), color: UDESC_GREEN },
+                { label: 'Testes Realizados', value: `${tests.length}`, color: UDESC_GREEN },
             ]);
+
+            // Classification Banner (se disponível)
+            if (options?.classification) {
+                const cl = options.classification;
+                const hex = cl.color.replace('#', '');
+                const r = parseInt(hex.substring(0, 2), 16) || 0;
+                const g = parseInt(hex.substring(2, 4), 16) || 102;
+                const b = parseInt(hex.substring(4, 6), 16) || 51;
+
+                const boxW = doc.internal.pageSize.getWidth() - 30;
+                const boxH = 35;
+
+                // 10% opacity background (blended with white manually for compatibility)
+                const br = Math.round(255 * 0.9 + r * 0.1);
+                const bg = Math.round(255 * 0.9 + g * 0.1);
+                const bb = Math.round(255 * 0.9 + b * 0.1);
+
+                doc.setFillColor(br, bg, bb);
+                doc.setDrawColor(r, g, b);
+                doc.setLineWidth(0.5);
+                doc.roundedRect(15, y, boxW, boxH, 5, 5, 'FD');
+
+                doc.setFillColor(r, g, b);
+                doc.roundedRect(15, y, 5, boxH, 2, 2, 'F');
+
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...TEXT_SECONDARY);
+                doc.text('CLASSIFICAÇÃO ATUAL - REGRA T-CAR', 30, y + 10);
+
+                doc.setFontSize(18);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(r, g, b);
+                doc.text(cl.label, 30, y + 26);
+
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...TEXT_SECONDARY);
+
+                const percentileText = `Percentil ${cl.percentile}`;
+                if (options.lastTestDate) {
+                    const dateStr = new Date(options.lastTestDate).toLocaleDateString('pt-BR');
+                    doc.text(`${percentileText}  |  Ultimo teste: ${dateStr}`, doc.internal.pageSize.getWidth() - 17, y + 26, { align: 'right' });
+                } else {
+                    doc.text(percentileText, doc.internal.pageSize.getWidth() - 17, y + 26, { align: 'right' });
+                }
+
+                y += boxH + 12;
+            }
 
             // Chart
             if (options?.chartImage) {
-                y = this.drawChartImage(doc, y, options.chartImage, 'Evolução PV Corrigido');
+                y = this.drawChartWithFrame(doc, y, options.chartImage, 'Evolucao do PV Corrigido');
             }
 
             // Table
-            y = this.drawSectionTitle(doc, y, 'Detalhamento dos Testes');
+            y = this.drawSectionTitleModern(doc, y, 'Detalhamento dos Testes');
 
-            const headers = ['#', 'Data', 'Nível', 'PV Corrigido', 'PV Bruto', 'FC Final', 'Estágios', 'Reps', 'Dist. (m)'];
-            const colWidths = [10, 25, 15, 25, 22, 20, 18, 15, 20];
+            const headers = ['#', 'Data', 'Nivel', 'PV Corrigido', 'PV Bruto', 'FC Final', 'Estagios', 'Reps', 'Distancia'];
+            const colWidths = [8, 22, 14, 23, 20, 20, 18, 15, 20];
+
             const rows = tests.map((t, i) => [
                 `${i + 1}`,
                 new Date(t.date).toLocaleDateString('pt-BR'),
@@ -452,21 +613,20 @@ class ExportServiceClass {
                 t.finalDistance != null ? `${t.finalDistance}` : '-',
             ]);
 
-            y = this.drawTable(doc, y, headers, colWidths, rows);
+            y = this.drawEnhancedTable(doc, y, headers, colWidths, rows, {
+                title: 'Historico completo de testes'
+            });
 
-            // Footer
-            this.drawFooter(doc);
+            this.drawEnhancedFooter(doc);
 
-            doc.save(`tcar_historico_${athleteName.replace(/\s+/g, '_')}.pdf`);
+            const fileName = `tcar_historico_${athleteName.replace(/\s+/g, '_')}.pdf`;
+            doc.save(fileName);
         } catch (error) {
             console.error('Erro ao gerar PDF do histórico:', error);
             throw new Error('Não foi possível gerar o PDF.');
         }
     }
 
-    /**
-     * Gera PDF profissional com ranking do grupo.
-     */
     async exportGroupRankingToPDF(
         ranking: {
             position: number;
@@ -475,14 +635,14 @@ class ExportServiceClass {
             lastPV: number;
             testCount: number;
         }[],
-        options?: { chartImage?: string | null; totalTests?: number }
+        options?: { chartImage?: string | null; totalTests?: number; team?: string | null }
     ): Promise<void> {
         try {
             const { default: jsPDF } = await import('jspdf');
             const doc = new jsPDF();
 
             // Header
-            let y = this.drawHeader(doc, 'Dashboard do Grupo', 'Ranking & Estatísticas');
+            let y = this.drawEnhancedHeader(doc, 'Dashboard do Grupo', undefined, options?.team ?? undefined);
 
             // Info Box
             const totalTests = options?.totalTests || ranking.reduce((s, r) => s + r.testCount, 0);
@@ -491,48 +651,51 @@ class ExportServiceClass {
                 : 0;
             const bestAthlete = ranking.length > 0 ? ranking[0] : null;
 
-            y = this.drawInfoBox(doc, y, [
-                { label: 'Data:', value: new Date().toLocaleDateString('pt-BR') },
-                { label: 'Horário:', value: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) },
+            y = this.drawModernInfoBox(doc, y, [
+                { label: 'Data do Relatorio:', value: new Date().toLocaleDateString('pt-BR') },
                 { label: 'Total de Atletas:', value: `${ranking.length}` },
                 { label: 'Total de Testes:', value: `${totalTests}` },
-            ], 2);
+                { label: 'Media do Grupo:', value: groupAvg.toFixed(2) },
+                { label: 'Lider:', value: bestAthlete ? bestAthlete.athleteName.split(' ')[0] : 'N/A' },
+                { label: 'PV do Lider:', value: bestAthlete ? bestAthlete.avgPV.toFixed(2) : 'N/A' },
+            ], 3);
 
             // Stat Cards
-            const stats = [
-                { label: 'PV Médio do Grupo', value: groupAvg.toFixed(2), color: UDESC_GREEN },
-                { label: 'Atletas', value: `${ranking.length}` },
-                { label: 'Testes Realizados', value: `${totalTests}` },
-            ];
-            if (bestAthlete) {
-                stats.push({ label: `Líder: ${bestAthlete.athleteName.split(' ')[0]}`, value: bestAthlete.avgPV.toFixed(2), color: UDESC_GREEN });
-            }
-            y = this.drawStatCards(doc, y, stats);
+            y = this.drawMetricCard(doc, y, [
+                { label: 'Media do Grupo', value: groupAvg.toFixed(2), color: UDESC_GREEN },
+                { label: 'Atletas', value: `${ranking.length}`, color: UDESC_GREEN },
+                { label: 'Testes', value: `${totalTests}`, color: UDESC_GREEN },
+                { label: 'Lider', value: bestAthlete ? bestAthlete.avgPV.toFixed(2) : '-', color: UDESC_GREEN },
+            ]);
 
             // Chart
             if (options?.chartImage) {
-                y = this.drawChartImage(doc, y, options.chartImage, 'PV Médio por Atleta');
+                y = this.drawChartWithFrame(doc, y, options.chartImage, 'Distribuição do PV Medio por Atleta');
             }
 
             // Ranking Table
-            y = this.drawSectionTitle(doc, y, 'Ranking Completo');
+            y = this.drawSectionTitleModern(doc, y, 'Ranking Completo');
 
-            const headers = ['Pos.', 'Atleta', 'PV Médio (km/h)', 'Último PV (km/h)', 'Nº Testes'];
-            const colWidths = [15, 55, 35, 35, 25];
+            const headers = ['Posicao', 'Atleta', 'PV Medio', 'Ultimo PV', 'Testes'];
+            const colWidths = [18, 60, 35, 35, 22];
+
             const rows = ranking.map(r => [
-                `#${r.position}`,
+                r.position === 1 ? '1º' : r.position === 2 ? '2º' : r.position === 3 ? '3º' : `#${r.position}`,
                 r.athleteName,
-                r.avgPV.toFixed(2),
-                r.lastPV.toFixed(2),
+                `${r.avgPV.toFixed(2)} km/h`,
+                `${r.lastPV.toFixed(2)} km/h`,
                 `${r.testCount}`,
             ]);
 
-            y = this.drawTable(doc, y, headers, colWidths, rows, { highlightFirst: true });
+            y = this.drawEnhancedTable(doc, y, headers, colWidths, rows, {
+                highlightFirst: true,
+                title: 'Classificação geral por PV médio'
+            });
 
-            // Footer
-            this.drawFooter(doc);
+            this.drawEnhancedFooter(doc);
 
-            doc.save(`tcar_ranking_${new Date().toISOString().split('T')[0]}.pdf`);
+            const fileName = `tcar_ranking_${new Date().toISOString().split('T')[0]}.pdf`;
+            doc.save(fileName);
         } catch (error) {
             console.error('Erro ao gerar PDF do ranking:', error);
             throw new Error('Não foi possível gerar o PDF.');
@@ -550,9 +713,9 @@ class ExportServiceClass {
         athleteResults: AthleteResult[]
     ): string {
         const headers = [
-            'Atleta', 'Estágios Completos', 'Reps Último Estágio', 'Total Reps',
+            'Atleta', 'Estagios Completos', 'Reps Ultimo Estagio', 'Total Reps',
             'PV Bruto (km/h)', 'PV Corrigido (km/h)', 'FC Final (bpm)',
-            'FC Estimada (bpm)', 'Distância (m)', 'Eliminado por Falha',
+            'FC Estimada (bpm)', 'Distancia (m)', 'Eliminado por Falha',
         ];
         const rows = athleteResults.map(ar => [
             `"${ar.athleteName}"`, ar.completedStages, ar.completedRepsInLastStage,
@@ -561,9 +724,9 @@ class ExportServiceClass {
             ar.eliminatedByFailure ? 'Sim' : 'Não',
         ]);
         const metaRows = [
-            [`T-CAR - Relatório de Teste`],
+            [`T-CAR - Relatorio de Teste`],
             [`Data: ${new Date(date).toLocaleDateString('pt-BR')}`],
-            [`Protocolo: Nível ${protocolLevel}`],
+            [`Protocolo: Nivel ${protocolLevel}`],
             [`Tempo Total: ${this.formatTime(totalTime)}`],
             [`Atletas: ${athleteResults.length}`],
             [],
@@ -578,7 +741,7 @@ class ExportServiceClass {
     exportGroupRankingToCSV(
         ranking: { position: number; athleteName: string; avgPV: number; testCount: number }[]
     ): string {
-        const headers = ['Posição', 'Atleta', 'PV Médio (km/h)', 'Nº Testes'];
+        const headers = ['Posicao', 'Atleta', 'PV Medio (km/h)', 'Nº Testes'];
         const rows = ranking.map(r => [`#${r.position}`, `"${r.athleteName}"`, r.avgPV.toFixed(2), r.testCount]);
         return [
             [`T-CAR - Ranking do Grupo`].join(','),
@@ -603,10 +766,6 @@ class ExportServiceClass {
         URL.revokeObjectURL(link.href);
     }
 
-    /**
-     * Captures a Recharts container as a PNG data URL for embedding in PDF.
-     * Pass the ref or DOM element of the chart container.
-     */
     async captureChartAsImage(chartElement: HTMLElement | null): Promise<string | null> {
         if (!chartElement) return null;
         try {

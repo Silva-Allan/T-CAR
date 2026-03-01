@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 
 interface RankingItem {
+    position?: number;
     athleteId: string;
     athleteName: string;
     avgPV: number;
@@ -29,6 +30,7 @@ export default function GroupDashboard() {
     const [ranking, setRanking] = useState<RankingItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [exporting, setExporting] = useState(false);
+    const [trainerProfile, setTrainerProfile] = useState<any>(null);
     const chartRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -39,8 +41,12 @@ export default function GroupDashboard() {
 
         const loadData = async () => {
             try {
-                const data = await SupabaseService.getGroupRanking();
-                setRanking(data);
+                const [rankingData, profileData] = await Promise.all([
+                    SupabaseService.getGroupRanking(),
+                    SupabaseService.getProfile()
+                ]);
+                setRanking(rankingData);
+                setTrainerProfile(profileData);
             } catch (error) {
                 console.error('Error loading ranking:', error);
             } finally {
@@ -81,12 +87,24 @@ export default function GroupDashboard() {
             await ExportService.exportGroupRankingToPDF(pdfRanking, {
                 chartImage,
                 totalTests,
+                team: trainerProfile?.club || undefined
             });
         } catch (error) {
             console.error('Error exporting PDF:', error);
         } finally {
             setExporting(false);
         }
+    };
+
+    const handleExportCSV = () => {
+        const csvRanking = ranking.map((r, i) => ({
+            position: i + 1,
+            athleteName: r.athleteName,
+            avgPV: r.avgPV,
+            testCount: r.testCount,
+        }));
+        const csv = ExportService.exportGroupRankingToCSV(csvRanking);
+        ExportService.downloadCSV(csv, `tcar_ranking_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
     if (loading) {
@@ -167,10 +185,16 @@ export default function GroupDashboard() {
                             Ranking
                         </h3>
                         {ranking.length > 0 && (
-                            <Button variant="ghost" size="sm" onClick={handleExportPDF} disabled={exporting}>
-                                <Download className="w-4 h-4 mr-1" />
-                                {exporting ? 'Gerando...' : 'PDF'}
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button variant="ghost" size="sm" onClick={handleExportCSV}>
+                                    <Download className="w-4 h-4 mr-1" />
+                                    CSV
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={handleExportPDF} disabled={exporting}>
+                                    <FileText className="w-4 h-4 mr-1" />
+                                    {exporting ? 'Gerando...' : 'PDF'}
+                                </Button>
+                            </div>
                         )}
                     </div>
 

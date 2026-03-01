@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Check,
@@ -43,7 +43,14 @@ export default function Results() {
   const [temperature, setTemperature] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [trainerProfile, setTrainerProfile] = useState<any>(null);
   const [expandedAthlete, setExpandedAthlete] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      SupabaseService.getProfile().then(setTrainerProfile);
+    }
+  }, [user]);
 
   if (!multiResult) {
     return (
@@ -219,7 +226,11 @@ export default function Results() {
         multiResult.protocol.level,
         multiResult.totalTime,
         new Date().toISOString(),
-        enrichedResults
+        enrichedResults,
+        {
+          team: trainerProfile?.club || undefined,
+          temperature: temperature ? parseFloat(temperature) : null
+        }
       );
     } catch (error) {
       toast({

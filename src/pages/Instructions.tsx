@@ -101,7 +101,7 @@ export default function Instructions() {
             onClick={() => navigate('/test')}
           >
             <Play className="w-6 h-6 mr-2 fill-current" />
-            Iniciar Protocolo v3.0
+            Iniciar Protocolo
           </Button>
         </div>
       </div>

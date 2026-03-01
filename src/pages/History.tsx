@@ -83,7 +83,7 @@ export default function History() {
 
     const rows = tests.flatMap(test =>
       test.test_results.map(result => [
-        new Date(test.date).toLocaleDateString('pt-BR'),
+        new Date(test.date.includes('T') ? test.date : `${test.date}T12:00:00`).toLocaleDateString('pt-BR'),
         result.athlete_name,
         `Nível ${test.protocol_level}`,
         Number(result.pv_corrigido).toFixed(2),
@@ -102,7 +102,9 @@ export default function History() {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    // Append T12:00:00 for date-only strings to avoid UTC midnight timezone shift
+    const normalized = dateString.includes('T') ? dateString : `${dateString}T12:00:00`;
+    const date = new Date(normalized);
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',

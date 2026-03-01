@@ -60,6 +60,8 @@ export type Database = {
           user_id: string | null
           email: string | null
           full_name: string | null
+          club: string | null
+          location: string | null
           created_at: string
           updated_at: string
         }
@@ -68,6 +70,8 @@ export type Database = {
           user_id?: string | null
           email?: string | null
           full_name?: string | null
+          club?: string | null
+          location?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -76,6 +80,8 @@ export type Database = {
           user_id?: string | null
           email?: string | null
           full_name?: string | null
+          club?: string | null
+          location?: string | null
           created_at?: string
           updated_at?: string
         }

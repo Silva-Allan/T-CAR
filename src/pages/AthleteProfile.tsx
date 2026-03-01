@@ -40,6 +40,7 @@ export default function AthleteProfile() {
   const { user } = useAuth();
   const [athlete, setAthlete] = useState<any>(null);
   const [tests, setTests] = useState<TestHistoryItem[]>([]);
+  const [trainerProfile, setTrainerProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const chartRef = useRef<HTMLDivElement>(null);
 
@@ -52,11 +53,13 @@ export default function AthleteProfile() {
     const loadData = async () => {
       if (!id) return;
       try {
-        const [athleteData, testsData] = await Promise.all([
+        const [athleteData, testsData, profileData] = await Promise.all([
           SupabaseService.getAthlete(id),
-          SupabaseService.getAthleteTestHistory(id)
+          SupabaseService.getAthleteTestHistory(id),
+          SupabaseService.getProfile(),
         ]);
         setAthlete(athleteData);
+        setTrainerProfile(profileData);
 
         // Debug: log raw data from Supabase to understand the structure
         if (testsData.length > 0) {
@@ -96,8 +99,11 @@ export default function AthleteProfile() {
     loadData();
   }, [id, user, navigate]);
 
+  // Bug fix: date-only strings like '2026-03-01' are parsed as UTC midnight
+  // which shows the previous day in Brazil (UTC-3). Fix: use noon local time.
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+    const normalized = dateString.includes('T') ? dateString : `${dateString}T12:00:00`;
+    return new Date(normalized).toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: '2-digit'
@@ -144,8 +150,53 @@ export default function AthleteProfile() {
       pv: Number(t.pv_corrigido),
       pvBruto: Number(t.pv_bruto),
       fc: t.fc_final ?? t.fc_estimada ?? null,
+      fcType: t.fc_final != null ? 'medida' : t.fc_estimada != null ? 'estimada' : null,
+      reps: t.total_reps,
       level: t.test.protocol_level,
     }));
+
+  // Beautiful custom Tooltip
+  const ChartTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const d = payload[0]?.payload;
+    const fcLabel = d?.fc != null
+      ? `${d.fc} bpm ${d.fcType === 'estimada' ? '(est.)' : ''}`
+      : 'Não informada';
+    return (
+      <div className="bg-card/95 backdrop-blur-sm border border-primary/30 rounded-2xl shadow-2xl p-4 text-xs min-w-[160px] space-y-2" style={{ boxShadow: '0 0 0 1px hsl(var(--primary)/0.2), 0 8px 32px rgba(0,0,0,0.25)' }}>
+        {/* Header */}
+        <div className="flex items-center gap-2 border-b border-border/50 pb-2">
+          <div className="w-2 h-2 rounded-full bg-primary" />
+          <p className="font-bold text-sm">{label}</p>
+          <span className="ml-auto text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">Nível {d?.level}</span>
+        </div>
+        {/* PV Corrigido */}
+        <div className="flex justify-between items-center gap-6">
+          <span className="text-muted-foreground">PV Corrigido</span>
+          <span className="font-bold text-primary text-sm">{d?.pv?.toFixed(2)} <span className="font-normal text-[10px]">km/h</span></span>
+        </div>
+        {/* PV Bruto */}
+        <div className="flex justify-between items-center gap-6">
+          <span className="text-muted-foreground">PV Bruto</span>
+          <span className="font-mono text-[11px]">{d?.pvBruto?.toFixed(2)} km/h</span>
+        </div>
+        {/* Divider */}
+        <div className="h-px bg-border/50" />
+        {/* FC */}
+        <div className="flex justify-between items-center gap-6">
+          <span className="text-muted-foreground flex items-center gap-1">❤️ FC</span>
+          <span className={cn('font-mono text-[11px]', d?.fc != null ? 'text-rose-500 font-semibold' : 'text-muted-foreground/60 italic')}>
+            {fcLabel}
+          </span>
+        </div>
+        {/* Reps */}
+        <div className="flex justify-between items-center gap-6">
+          <span className="text-muted-foreground">Repetições</span>
+          <span className="font-mono text-[11px]">{d?.reps}</span>
+        </div>
+      </div>
+    );
+  };
 
   const avgPV = stats?.average ?? 0;
 
@@ -168,11 +219,41 @@ export default function AthleteProfile() {
           completedStages: t.completed_stages,
           finalDistance: Number(t.final_distance),
         })),
-        { chartImage }
+        { chartImage, team: (trainerProfile as any)?.club ?? undefined, classification, lastTestDate: lastTest?.test.date ?? undefined }
       );
     } catch (error) {
       console.error('Erro ao exportar PDF:', error);
     }
+  };
+
+  const handleExportJson = () => {
+    if (!athlete || tests.length === 0) return;
+    const data = {
+      athlete: {
+        name: athlete.name,
+        team: athlete.team,
+        position: athlete.position,
+        birth_date: athlete.birth_date,
+        gender: athlete.gender,
+      },
+      history: tests.map(t => ({
+        date: t.test.date,
+        protocol: t.test.protocol_level,
+        pv_corrigido: Number(t.pv_corrigido),
+        pv_bruto: Number(t.pv_bruto),
+        fc_final: t.fc_final,
+        fc_estimada: t.fc_estimada,
+        distancia: t.final_distance,
+        repeticoes: t.total_reps
+      }))
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tcar-atleta-${athlete.name.toLowerCase().replace(/\s+/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -276,7 +357,7 @@ export default function AthleteProfile() {
         {chartData.length >= 1 && (
           <div className="glass-card p-4 rounded-xl">
             <h3 className="font-semibold mb-4">Evolução PV Corrigido</h3>
-            <div className="h-64" ref={chartRef}>
+            <div className="h-80" ref={chartRef}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -290,34 +371,26 @@ export default function AthleteProfile() {
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={11}
                   />
-                  <Tooltip
-                    contentStyle={{
-                      background: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px'
-                    }}
-                    formatter={(value: number, name: string) => {
-                      if (name === 'PV Corrigido') return [`${value.toFixed(2)} km/h`, 'PV Corrigido'];
-                      return [value, name];
-                    }}
-                    labelFormatter={(label) => `Data: ${label}`}
-                  />
+                  <Tooltip content={<ChartTooltip />} />
                   <Bar
                     dataKey="pv"
                     fill="hsl(var(--primary))"
                     radius={[4, 4, 0, 0]}
                     name="PV Corrigido"
                   >
+                    {/* PV label on top */}
                     <LabelList
                       dataKey="pv"
                       position="top"
-                      formatter={(value: number) => value.toFixed(2)}
-                      style={{
-                        fill: 'hsl(var(--foreground))',
-                        fontSize: 10,
-                        fontWeight: 'bold',
-                        fontFamily: 'monospace',
-                      }}
+                      formatter={(value: number) => value.toFixed(1)}
+                      style={{ fill: 'hsl(var(--foreground))', fontSize: 9, fontWeight: 'bold', fontFamily: 'monospace' }}
+                    />
+                    {/* FC label inside or below PV label */}
+                    <LabelList
+                      dataKey="fc"
+                      position="insideTop"
+                      formatter={(value: number | null) => value != null ? `${value}bpm` : ''}
+                      style={{ fill: 'rgb(251,113,133)', fontSize: 8, fontWeight: '600' }}
                     />
                   </Bar>
                   {/* Linha da média geral */}
@@ -349,10 +422,16 @@ export default function AthleteProfile() {
               Histórico ({tests.length})
             </h3>
             {tests.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={handleExportHistory}>
-                <Download className="w-4 h-4 mr-1" />
-                PDF
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={handleExportJson} className="text-[10px] h-8">
+                  <Download className="w-3.5 h-3.5 mr-1 text-primary" />
+                  JSON
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleExportHistory} className="text-[10px] h-8">
+                  <Download className="w-3.5 h-3.5 mr-1" />
+                  PDF
+                </Button>
+              </div>
             )}
           </div>
 

@@ -19,7 +19,10 @@ import TestDetails from "./pages/TestDetails";
 import Settings from "./pages/Settings";
 import About from "./pages/About";
 import GroupDashboard from "./pages/GroupDashboard";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfUse from "./pages/TermsOfUse";
 import NotFound from "./pages/NotFound";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -34,18 +37,22 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/select-athletes" element={<SelectAthletes />} />
-              <Route path="/configure-test" element={<ConfigureTest />} />
-              <Route path="/instructions" element={<Instructions />} />
-              <Route path="/test" element={<TestExecution />} />
-              <Route path="/test/:id" element={<TestDetails />} />
-              <Route path="/results" element={<Results />} />
-              <Route path="/athletes" element={<Athletes />} />
-              <Route path="/athlete/:id" element={<AthleteProfile />} />
-              <Route path="/history" element={<History />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/group" element={<GroupDashboard />} />
+
+              <Route path="/select-athletes" element={<ProtectedRoute><SelectAthletes /></ProtectedRoute>} />
+              <Route path="/configure-test" element={<ProtectedRoute><ConfigureTest /></ProtectedRoute>} />
+              <Route path="/instructions" element={<ProtectedRoute><Instructions /></ProtectedRoute>} />
+              <Route path="/test" element={<ProtectedRoute><TestExecution /></ProtectedRoute>} />
+              <Route path="/test/:id" element={<ProtectedRoute><TestDetails /></ProtectedRoute>} />
+              <Route path="/results" element={<ProtectedRoute><Results /></ProtectedRoute>} />
+              <Route path="/athletes" element={<ProtectedRoute><Athletes /></ProtectedRoute>} />
+              <Route path="/athlete/:id" element={<ProtectedRoute><AthleteProfile /></ProtectedRoute>} />
+              <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/group" element={<ProtectedRoute><GroupDashboard /></ProtectedRoute>} />
+
               <Route path="/about" element={<About />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfUse />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

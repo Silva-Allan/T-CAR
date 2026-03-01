@@ -13,6 +13,7 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -24,9 +25,9 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
-    
+
     setSubmitting(true);
-    
+
     if (mode === 'signup') {
       const { error } = await signUp(email, password, fullName);
       if (!error) {
@@ -38,7 +39,7 @@ export default function Auth() {
         navigate('/');
       }
     }
-    
+
     setSubmitting(false);
   };
 
@@ -69,8 +70,8 @@ export default function Auth() {
           <button
             className={cn(
               "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all",
-              mode === 'login' 
-                ? "bg-primary text-primary-foreground" 
+              mode === 'login'
+                ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setMode('login')}
@@ -80,8 +81,8 @@ export default function Auth() {
           <button
             className={cn(
               "flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all",
-              mode === 'signup' 
-                ? "bg-primary text-primary-foreground" 
+              mode === 'signup'
+                ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setMode('signup')}
@@ -104,7 +105,7 @@ export default function Auth() {
               />
             </div>
           )}
-          
+
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
@@ -130,11 +131,27 @@ export default function Auth() {
             />
           </div>
 
-          <Button 
-            type="submit" 
-            className="w-full" 
+          {mode === 'signup' && (
+            <div className="flex items-start space-x-2 py-2 animate-fade-in">
+              <input
+                type="checkbox"
+                id="terms"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                required
+              />
+              <label htmlFor="terms" className="text-xs text-muted-foreground leading-tight">
+                Eu aceito os <a href="/terms" target="_blank" className="text-primary hover:underline font-bold">Termos de Uso</a> e a <a href="/privacy" target="_blank" className="text-primary hover:underline font-bold">Politica de Privacidade</a>, e confirmo que sou o Controlador dos dados de atletas que virem a ser cadastrados.
+              </label>
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full"
             size="lg"
-            disabled={submitting || !email || !password}
+            disabled={submitting || !email || !password || (mode === 'signup' && !agreedToTerms)}
           >
             {submitting ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -151,7 +168,7 @@ export default function Auth() {
         <p className="text-center text-sm text-muted-foreground">
           Teste de Carminatti © {new Date().getFullYear()}
         </p>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
