@@ -28,10 +28,11 @@ interface TestWithResults {
   test_results: {
     id: string;
     athlete_name: string;
-    peak_velocity: number;
+    pv_corrigido: number;
     completed_stages: number;
     final_distance: number;
-    heart_rate: number | null;
+    fc_final: number | null;
+    fc_estimada: number | null;
     eliminated_by_failure: boolean;
   }[];
 }
@@ -58,7 +59,7 @@ export default function History() {
   const loadTests = async () => {
     try {
       const data = await SupabaseService.getTests();
-      setTests(data as TestWithResults[]);
+      setTests(data as unknown as TestWithResults[]);
     } catch (error) {
       console.error('Error loading tests:', error);
     } finally {
@@ -78,30 +79,31 @@ export default function History() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Data', 'Atleta', 'Protocolo', 'PV-TCAR', 'Estágios', 'Distância', 'FC'];
-    
-    const rows = tests.flatMap(test => 
+    const headers = ['Data', 'Atleta', 'Protocolo', 'PV Corrigido', 'Estágios', 'Distância', 'FC'];
+
+    const rows = tests.flatMap(test =>
       test.test_results.map(result => [
         new Date(test.date).toLocaleDateString('pt-BR'),
         result.athlete_name,
         `Nível ${test.protocol_level}`,
-        Number(result.peak_velocity).toFixed(2),
+        Number(result.pv_corrigido).toFixed(2),
         result.completed_stages.toString(),
         `${result.final_distance}m`,
-        result.heart_rate?.toString() || '-'
+        result.fc_final?.toString() || (result.fc_estimada ? `~${result.fc_estimada}` : '-')
       ])
     );
 
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `tcar_results_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `tcar_resultados_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -121,9 +123,9 @@ export default function History() {
   }
 
   return (
-    <PageContainer 
-      title={t('historyTitle')} 
-      showBack 
+    <PageContainer
+      title={t('historyTitle')}
+      showBack
       backTo="/"
       action={
         tests.length > 0 && (
@@ -159,119 +161,121 @@ export default function History() {
             {tests
               .filter(test => !dateFilter || test.date.startsWith(dateFilter))
               .map((test, index) => (
-              <div
-                key={test.id}
-                className="glass-card rounded-xl animate-fade-in overflow-hidden"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                {/* Card Header */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-semibold flex items-center gap-2">
-                        <Users className="w-4 h-4" />
-                        {test.test_results.length} atleta{test.test_results.length !== 1 ? 's' : ''}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(test.date)}
-                      </p>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => navigate(`/test/${test.id}`)}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setDeleteId(test.id)}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Athletes preview */}
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {test.test_results.slice(0, 3).map(result => (
-                      <span 
-                        key={result.id}
-                        className="text-xs px-2 py-1 rounded-full bg-secondary text-muted-foreground"
-                      >
-                        {result.athlete_name}
-                      </span>
-                    ))}
-                    {test.test_results.length > 3 && (
-                      <span className="text-xs px-2 py-1 rounded-full bg-secondary text-muted-foreground">
-                        +{test.test_results.length - 3}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Stats row */}
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Gauge className="w-4 h-4" />
-                      <span>{t('level')} {test.protocol_level}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Clock className="w-4 h-4" />
-                      <span>{CalculatorService.formatTime(test.total_time)}</span>
-                    </div>
-                  </div>
-
-                  {/* Expand button */}
-                  <button
-                    className="w-full mt-3 pt-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => setExpandedId(expandedId === test.id ? null : test.id)}
-                  >
-                    {expandedId === test.id ? (
-                      <>{t('collapse')} <ChevronUp className="w-4 h-4" /></>
-                    ) : (
-                      <>{t('viewResults')} <ChevronDown className="w-4 h-4" /></>
-                    )}
-                  </button>
-                </div>
-
-                {/* Expanded content */}
-                {expandedId === test.id && (
-                  <div className="border-t border-border/50 p-4 bg-secondary/30 space-y-2">
-                    {test.test_results
-                      .sort((a, b) => Number(b.peak_velocity) - Number(a.peak_velocity))
-                      .map((result, idx) => (
-                      <div 
-                        key={result.id}
-                        className={cn(
-                          "flex items-center justify-between p-3 rounded-lg bg-background/50",
-                          result.eliminated_by_failure && "border border-destructive/30"
-                        )}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                            {idx + 1}
-                          </span>
-                          <div>
-                            <p className="font-medium text-sm">{result.athlete_name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {result.completed_stages} estágios • {result.final_distance}m
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-mono font-bold text-primary">
-                            {Number(result.peak_velocity).toFixed(2)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">km/h</p>
-                        </div>
+                <div
+                  key={test.id}
+                  className="glass-card rounded-xl animate-fade-in overflow-hidden"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  {/* Card Header */}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="font-semibold flex items-center gap-2">
+                          <Users className="w-4 h-4 text-primary" />
+                          {test.test_results.length} atleta{test.test_results.length !== 1 ? 's' : ''}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(test.date)}
+                        </p>
                       </div>
-                    ))}
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => navigate(`/test/${test.id}`)}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setDeleteId(test.id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Athletes preview */}
+                    <div className="flex flex-wrap gap-1 mb-3">
+                      {test.test_results.slice(0, 3).map(result => (
+                        <span
+                          key={result.id}
+                          className="text-xs px-2 py-1 rounded-full bg-secondary text-muted-foreground"
+                        >
+                          {result.athlete_name}
+                        </span>
+                      ))}
+                      {test.test_results.length > 3 && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-secondary text-muted-foreground">
+                          +{test.test_results.length - 3}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Gauge className="w-4 h-4" />
+                        <span>{t('level')} {test.protocol_level}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="w-4 h-4" />
+                        <span>{CalculatorService.formatTime(Number(test.total_time))}</span>
+                      </div>
+                    </div>
+
+                    {/* Expand button */}
+                    <button
+                      className="w-full mt-3 pt-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => setExpandedId(expandedId === test.id ? null : test.id)}
+                    >
+                      {expandedId === test.id ? (
+                        <>{t('collapse')} <ChevronUp className="w-4 h-4" /></>
+                      ) : (
+                        <>{t('viewResults')} <ChevronDown className="w-4 h-4" /></>
+                      )}
+                    </button>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Expanded content */}
+                  {expandedId === test.id && (
+                    <div className="border-t border-border/50 p-4 bg-secondary/30 space-y-2">
+                      {test.test_results
+                        .sort((a, b) => Number(b.pv_corrigido) - Number(a.pv_corrigido))
+                        .map((result, idx) => (
+                          <div
+                            key={result.id}
+                            className={cn(
+                              "flex items-center justify-between p-3 rounded-lg bg-background/50",
+                              result.eliminated_by_failure && "border border-destructive/30"
+                            )}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
+                                {idx + 1}
+                              </span>
+                              <div>
+                                <p className="font-medium text-sm">{result.athlete_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {result.completed_stages} estágios • {result.final_distance}m
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-mono font-bold text-primary">
+                                {Number(result.pv_corrigido).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {result.fc_final ? `${result.fc_final} bpm` : (result.fc_estimada ? `~${result.fc_estimada} bpm` : 'km/h')}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ))}
           </div>
         )}
       </div>

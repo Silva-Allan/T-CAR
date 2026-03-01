@@ -1,13 +1,19 @@
-import { TestProtocol } from '@/models/types';
+// ======================================================================
+// T-CAR 2.0 — Calculator Service (Atualizado)
+// ======================================================================
+// REGRA DE OURO: Toda lógica científica é client-side.
+// ======================================================================
+
+import { TestProtocol, calculateAge } from '@/models/types';
+import { PVTableService } from './PVTableService';
 
 class CalculatorServiceClass {
   /**
-   * Calculate Peak Velocity (PV-TCAR)
-   * If last stage is complete: PV = velocity of last complete stage
-   * If last stage is incomplete: PV = v + (ns / 10) × 0.6
-   * Where v = velocity of last complete stage, ns = completed reps in incomplete stage
+   * Calcula o PV bruto (Peak Velocity) baseado na fórmula original.
+   * Se último estágio completo: PV = velocidade do último estágio completo
+   * Se incompleto: PV = v + (ns / 5) × 0.6
    */
-  calculatePeakVelocity(
+  calculateRawPV(
     protocol: TestProtocol,
     completedStages: number,
     completedRepsInLastStage: number,
@@ -19,27 +25,70 @@ class CalculatorServiceClass {
       return lastCompleteStageVelocity;
     }
 
-    // Incomplete stage calculation
-    const incompleteStageFraction = (completedRepsInLastStage / 10) * 0.6;
+    const incompleteStageFraction = (completedRepsInLastStage / 5) * 0.6;
     return Number((lastCompleteStageVelocity + incompleteStageFraction).toFixed(2));
   }
 
   /**
-   * Get speed at a specific stage
+   * Calcula o PV corrigido usando a tabela de correção T-CAR.
+   * pv_corrigido = PV_TABLE[level][totalReps]
+   */
+  calculateCorrectedPV(level: 1 | 2, totalReps: number): number {
+    return PVTableService.getCorrectedPV(level, totalReps);
+  }
+
+  /**
+   * Calcula o total de repetições.
+   */
+  calculateTotalReps(
+    completedStages: number,
+    completedRepsInLastStage: number,
+    isLastStageComplete: boolean
+  ): number {
+    return PVTableService.calculateTotalReps(
+      completedStages,
+      completedRepsInLastStage,
+      isLastStageComplete
+    );
+  }
+
+  /**
+   * Calcular FC (Frequência Cardíaca).
+   * Se fc_final não foi medida → fc_estimada = 220 - idade
+   * Se fc_final foi medida → fc_estimada = null
+   */
+  calculateFC(
+    fcFinal: number | null | undefined,
+    birthDate: string | undefined
+  ): { fcFinal: number | null; fcEstimada: number | null } {
+    if (fcFinal != null && fcFinal > 0) {
+      return { fcFinal, fcEstimada: null };
+    }
+
+    if (birthDate) {
+      const age = calculateAge(birthDate);
+      return { fcFinal: null, fcEstimada: 220 - age };
+    }
+
+    return { fcFinal: null, fcEstimada: null };
+  }
+
+  /**
+   * Velocidade em um estágio específico.
    */
   getSpeedAtStage(protocol: TestProtocol, stage: number): number {
     return Number((protocol.initialSpeed + (stage - 1) * protocol.speedIncrement).toFixed(1));
   }
 
   /**
-   * Get distance at a specific stage
+   * Distância em um estágio específico.
    */
   getDistanceAtStage(protocol: TestProtocol, stage: number): number {
     return protocol.initialDistance + (stage - 1) * protocol.distanceIncrement;
   }
 
   /**
-   * Calculate total distance covered
+   * Distância total percorrida.
    */
   calculateTotalDistance(
     protocol: TestProtocol,
@@ -49,14 +98,11 @@ class CalculatorServiceClass {
   ): number {
     let totalDistance = 0;
 
-    // Add distance from fully completed stages
     for (let stage = 1; stage <= completedStages; stage++) {
       const stageDistance = this.getDistanceAtStage(protocol, stage);
-      // Each stage has 5 reps, each rep is 2 directions (out and back)
       totalDistance += stageDistance * 2 * 5;
     }
 
-    // Add distance from incomplete stage if applicable
     if (!isLastStageComplete && completedRepsInLastStage > 0) {
       const incompleteStageDistance = this.getDistanceAtStage(protocol, completedStages + 1);
       totalDistance += incompleteStageDistance * 2 * completedRepsInLastStage;
@@ -66,7 +112,7 @@ class CalculatorServiceClass {
   }
 
   /**
-   * Format time in MM:SS format
+   * Formatar tempo em MM:SS.
    */
   formatTime(seconds: number): string {
     const mins = Math.floor(seconds / 60);
@@ -75,7 +121,7 @@ class CalculatorServiceClass {
   }
 
   /**
-   * Get protocol configuration
+   * Obter configuração do protocolo por nível.
    */
   getProtocol(level: 1 | 2): TestProtocol {
     return {
@@ -84,7 +130,7 @@ class CalculatorServiceClass {
       initialDistance: level === 1 ? 15 : 20,
       speedIncrement: 0.6,
       distanceIncrement: 1,
-      repDuration: 18, // 6s going + 6s returning + 6s recovery
+      repDuration: 18,
       repsPerStage: 5,
       stageDuration: 90,
     };

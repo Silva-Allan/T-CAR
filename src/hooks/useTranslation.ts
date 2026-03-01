@@ -19,6 +19,7 @@ const translations = {
     other: 'Outro',
     optional: '(opcional)',
     continue: 'Continuar',
+    gender: 'Sexo',
     // Athletes
     athletesTitle: 'Atletas',
     newAthlete: 'Novo Atleta',
@@ -85,6 +86,7 @@ const translations = {
     other: 'Other',
     optional: '(optional)',
     continue: 'Continue',
+    gender: 'Gender',
     // Athletes
     athletesTitle: 'Athletes',
     newAthlete: 'New Athlete',
@@ -151,6 +153,7 @@ const translations = {
     other: 'Otro',
     optional: '(opcional)',
     continue: 'Continuar',
+    gender: 'Sexo',
     // Athletes
     athletesTitle: 'Atletas',
     newAthlete: 'Nuevo Atleta',
@@ -161,9 +164,43 @@ const translations = {
     deleteAthleteDesc: 'Esta acción no se puede deshacer. Se mantendrá el historial.',
     viewTests: 'Ver pruebas',
     collapse: 'Colapsar',
-    noTests: 'Ninguna prueba realizada',
+    noTests: 'Sin pruebas realizadas',
     viewAll: 'Ver todos',
-    // ... (fallback to pt/en for others if needed)
+    // Select Athletes
+    selectAthletesTitle: 'Seleccionar Atletas',
+    selectInfo: 'Seleccione de 1 a 10 atletas',
+    selectedCount: 'seleccionados',
+    quickAdd: 'Añadir nuevo atleta',
+    registeredAthletes: 'Atletas registrados',
+    continueWith: 'Continuar con',
+    // History
+    historyTitle: 'Historial',
+    filterDate: 'Filtrar por fecha',
+    noTestsPerformed: 'Sin pruebas realizadas',
+    deleteTestTitle: '¿Eliminar prueba?',
+    deleteTestDesc: 'Esta acción no se puede deshacer. Se eliminarán todos los resultados.',
+    level: 'Nivel',
+    viewResults: 'Ver resultados',
+    // Settings
+    settingsTitle: 'Configuración',
+    connected: 'Conectado',
+    logout: 'Salir',
+    audioVolume: 'Volumen de Audio',
+    beepType: 'Tipo de Bip',
+    standard: 'Estándar',
+    high: 'Agudo',
+    double: 'Doble',
+    descStandard: 'Bip simple 440Hz',
+    descHigh: 'Tono más alto 880Hz',
+    descDouble: 'Dos bips rápidos',
+    language: 'Idioma',
+    resetData: 'Resetear Datos Locales',
+    resetDataDesc: 'Elimina datos locales (configuración). Los datos en la nube se conservarán.',
+    resetDataTitle: '¿Resetear datos locales?',
+    resetDataConfirmDesc: 'Esta acción eliminará la configuración local. Sus atletas y pruebas guardadas en la nube se mantendrán.',
+    reset: 'Resetear',
+    logoutTitle: '¿Cerrar sesión?',
+    logoutDesc: 'Deberá iniciar sesión nuevamente para acceder a sus datos.',
   }
 };
 

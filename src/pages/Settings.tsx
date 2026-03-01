@@ -31,8 +31,7 @@ export default function Settings() {
     updateSettings({ volume: value[0] / 100 });
   };
 
-  const handleBeepTypeChange = async (type: BeepType) => {
-    updateSettings({ beepType: type });
+  const handleTestAudio = async () => {
     if (!isAudioReady) {
       await initializeAudio();
     }
@@ -55,17 +54,12 @@ export default function Settings() {
 
   const beepTypes: { type: BeepType; label: string; description: string }[] = [
     { type: 'standard', label: t('standard'), description: t('descStandard') },
-    { type: 'high', label: t('high'), description: t('descHigh') },
-    { type: 'double', label: t('double'), description: t('descDouble') },
   ];
 
   const LANGUAGES = [
     { code: 'pt', name: 'Português', flag: '🇧🇷' },
     { code: 'en', name: 'English', flag: '🇺🇸' },
     { code: 'es', name: 'Español', flag: '🇪🇸' },
-    { code: 'fr', name: 'Français', flag: '🇫🇷' },
-    { code: 'it', name: 'Italiano', flag: '🇮🇹' },
-    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
   ];
 
   return (
@@ -79,8 +73,8 @@ export default function Settings() {
                 <p className="font-semibold">{user.email}</p>
                 <p className="text-sm text-muted-foreground">{t('connected')}</p>
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => setShowLogoutDialog(true)}
               >
@@ -91,7 +85,7 @@ export default function Settings() {
           </div>
         )}
 
-        {/* Volume */}
+        {/* Audio Volume Only - Beep type selection removed as per protocol 3.0 */}
         <div className="glass-card p-5 rounded-xl">
           <div className="flex items-center gap-3 mb-4">
             <Volume2 className="w-5 h-5 text-primary" />
@@ -111,66 +105,36 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* Beep type */}
-        <div className="glass-card p-5 rounded-xl">
-          <div className="flex items-center gap-3 mb-4">
-            <Bell className="w-5 h-5 text-primary" />
-            <h3 className="font-semibold">{t('beepType')}</h3>
-          </div>
-          <div className="space-y-2">
-            {beepTypes.map((beep) => (
-              <button
-                key={beep.type}
-                className={cn(
-                  "w-full p-3 rounded-lg text-left transition-all flex items-center justify-between",
-                  settings.beepType === beep.type
-                    ? "bg-primary/10 border border-primary/30"
-                    : "bg-secondary hover:bg-secondary/80"
-                )}
-                onClick={() => handleBeepTypeChange(beep.type)}
-              >
-                <div>
-                  <p className="font-medium">{beep.label}</p>
-                  <p className="text-sm text-muted-foreground">{beep.description}</p>
-                </div>
-                {settings.beepType === beep.type && (
-                  <div className="w-4 h-4 rounded-full bg-primary" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Language */}
         <div className="glass-card p-5 rounded-xl">
           <div className="flex items-center gap-3 mb-4">
             <Globe className="w-5 h-5 text-primary" />
             <h3 className="font-semibold">{t('language')}</h3>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {LANGUAGES.map((lang) => {
               const isSelected = settings.language === lang.code;
               return (
-              <button
-                key={lang.code}
-                className={cn(
-                  "relative flex items-center gap-3 p-3 rounded-lg border transition-all text-left",
-                  isSelected 
-                    ? "bg-primary/10 border-primary/50" 
-                    : "bg-card border-transparent hover:bg-accent"
-                )}
-                onClick={() => handleLanguageChange(lang.code)}
-              >
-                <span className="text-xl">{lang.flag}</span>
-                <span className={cn("font-medium flex-1", isSelected ? "text-primary" : "text-foreground")}>
-                  {lang.name}
-                </span>
-                {isSelected && (
-                  <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="w-3 h-3 text-primary-foreground" />
-                  </div>
-                )}
-              </button>
+                <button
+                  key={lang.code}
+                  className={cn(
+                    "relative flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all",
+                    isSelected
+                      ? "bg-primary/10 border-primary/50 shadow-sm"
+                      : "bg-card border-transparent hover:bg-accent"
+                  )}
+                  onClick={() => handleLanguageChange(lang.code)}
+                >
+                  <span className="text-2xl">{lang.flag}</span>
+                  <span className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground")}>
+                    {lang.name}
+                  </span>
+                  {isSelected && (
+                    <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
               );
             })}
           </div>

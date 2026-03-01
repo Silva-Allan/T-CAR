@@ -3,6 +3,8 @@ import { Athlete, TestResult, AppSettings, TestProtocol, MultiAthleteTestResult,
 import { StorageService } from '@/services/StorageService';
 import { AudioService } from '@/services/AudioService';
 import { CalculatorService } from '@/services/CalculatorService';
+import { IndexedDBService } from '@/services/IndexedDBService';
+import { SyncService, SyncStatus } from '@/services/SyncService';
 
 interface AppContextType {
   // Athletes
@@ -38,6 +40,9 @@ interface AppContextType {
 
   // Export
   exportToCSV: () => void;
+
+  // Sync
+  syncStatus: SyncStatus | null;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -53,19 +58,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [multiResults, setMultiResults] = useState<MultiAthleteTestResult[]>([]);
   const [settings, setSettings] = useState<AppSettings>(StorageService.getSettings());
   const [isAudioReady, setIsAudioReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
 
-  // Load data on mount
+  // Load data on mount + init IndexedDB + start sync monitoring
   useEffect(() => {
     setAthletes(StorageService.getAthletes());
     setResults(StorageService.getResults());
     setSettings(StorageService.getSettings());
+
+    // Inicializar IndexedDB e sync
+    IndexedDBService.init().then(() => {
+      SyncService.startMonitoring();
+    });
+
+    // Listener de status de sincronização
+    const unsubscribe = SyncService.onStatusChange(setSyncStatus);
+    return () => unsubscribe();
   }, []);
 
   // Apply settings to audio service
   useEffect(() => {
     AudioService.setVolume(settings.volume);
-    AudioService.setBeepType(settings.beepType);
-  }, [settings.volume, settings.beepType]);
+  }, [settings.volume]);
 
   const initializeAudio = async (): Promise<boolean> => {
     const success = await AudioService.initialize();
@@ -120,7 +134,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       id: crypto.randomUUID(),
       date: new Date().toISOString(),
     };
-    // For now, store in localStorage with a different key
     const existing = JSON.parse(localStorage.getItem('tcar_multi_results') || '[]');
     existing.push(newResult);
     localStorage.setItem('tcar_multi_results', JSON.stringify(existing));
@@ -184,6 +197,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isAudioReady,
         initializeAudio,
         exportToCSV,
+        syncStatus,
       }}
     >
       {children}

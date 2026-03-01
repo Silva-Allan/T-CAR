@@ -18,6 +18,7 @@ import History from "./pages/History";
 import TestDetails from "./pages/TestDetails";
 import Settings from "./pages/Settings";
 import About from "./pages/About";
+import GroupDashboard from "./pages/GroupDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => (
               <Route path="/athlete/:id" element={<AthleteProfile />} />
               <Route path="/history" element={<History />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/group" element={<GroupDashboard />} />
               <Route path="/about" element={<About />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

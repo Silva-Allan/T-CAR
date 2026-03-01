@@ -4,7 +4,6 @@ import { Plus, User, Trash2, Edit2, X, Check, ChevronDown, ChevronUp, ExternalLi
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SupabaseService } from '@/services/SupabaseService';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -23,16 +22,17 @@ import {
 interface Athlete {
   id: string;
   name: string;
-  sport: 'athletics' | 'cycling' | 'other' | null;
+  email: string | null;
+  birth_date: string | null;
+  gender: 'M' | 'F' | 'Outro' | null;
   team: string | null;
   position: string | null;
-  pvTcar?: number;
 }
 
 interface AthleteTest {
   id: string;
-  peak_velocity: number;
-  tests: {
+  pv_corrigido: number;
+  test: {
     date: string;
     protocol_level: number;
   } | null;
@@ -49,13 +49,14 @@ export default function Athletes() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [gender, setGender] = useState('');
   const [team, setTeam] = useState('');
   const [position, setPosition] = useState('');
-  const [sport, setSport] = useState<'athletics' | 'cycling' | 'other'>('athletics');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [pvTcarFilter, setPvTcarFilter] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -68,10 +69,7 @@ export default function Athletes() {
   const loadAthletes = async () => {
     try {
       const data = await SupabaseService.getAthletes();
-      setAthletes(data.map((a: any) => ({
-        ...a,
-        pvTcar: a.pv_tcar
-      })) as Athlete[]);
+      setAthletes(data as unknown as Athlete[]);
     } catch (error) {
       console.error('Error loading athletes:', error);
     } finally {
@@ -82,7 +80,7 @@ export default function Athletes() {
   const loadAthleteTests = async (athleteId: string) => {
     if (athleteTests[athleteId]) return;
     try {
-      const tests = await SupabaseService.getAthleteTests(athleteId);
+      const tests = await SupabaseService.getAthleteTestHistory(athleteId);
       setAthleteTests(prev => ({ ...prev, [athleteId]: tests as unknown as AthleteTest[] }));
     } catch (error) {
       console.error('Error loading athlete tests:', error);
@@ -106,16 +104,20 @@ export default function Athletes() {
       if (editingId) {
         await SupabaseService.updateAthlete(editingId, {
           name: name.trim(),
+          email: email.trim() || null,
+          birth_date: birthDate || null,
+          gender: gender || null,
           team: team || null,
           position: position || null,
-          sport
         });
       } else {
         await SupabaseService.createAthlete({
           name: name.trim(),
+          email: email.trim() || null,
+          birth_date: birthDate || null,
+          gender: gender || null,
           team: team || null,
           position: position || null,
-          sport
         });
       }
       await loadAthletes();
@@ -123,6 +125,7 @@ export default function Athletes() {
     } catch (error) {
       console.error('Error saving athlete:', error);
     } finally {
+      resetForm();
       setSubmitting(false);
     }
   };
@@ -130,9 +133,11 @@ export default function Athletes() {
   const handleEdit = (athlete: Athlete) => {
     setEditingId(athlete.id);
     setName(athlete.name);
+    setEmail(athlete.email || '');
+    setBirthDate(athlete.birth_date || '');
+    setGender(athlete.gender || '');
     setTeam(athlete.team || '');
     setPosition(athlete.position || '');
-    setSport(athlete.sport || 'athletics');
     setShowForm(true);
   };
 
@@ -151,9 +156,11 @@ export default function Athletes() {
     setShowForm(false);
     setEditingId(null);
     setName('');
+    setEmail('');
+    setBirthDate('');
+    setGender('');
     setTeam('');
     setPosition('');
-    setSport('athletics');
   };
 
   const formatDate = (dateString: string) => {
@@ -162,14 +169,6 @@ export default function Athletes() {
       month: '2-digit',
       year: '2-digit'
     });
-  };
-
-  const getSportLabel = (s: string | null) => {
-    switch (s) {
-      case 'athletics': return t('athletics');
-      case 'cycling': return t('cycling');
-      default: return t('other');
-    }
   };
 
   if (loading) {
@@ -183,9 +182,9 @@ export default function Athletes() {
   }
 
   return (
-    <PageContainer 
-      title={t('athletesTitle')} 
-      showBack 
+    <PageContainer
+      title={t('athletesTitle')}
+      showBack
       backTo="/"
       action={
         !showForm && (
@@ -208,7 +207,7 @@ export default function Athletes() {
                 <X className="w-4 h-4" />
               </Button>
             </div>
-            
+
             <div className="space-y-3">
               <Input
                 placeholder={`${t('name')} *`}
@@ -216,16 +215,31 @@ export default function Athletes() {
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
               />
-              <Select value={sport} onValueChange={(v) => setSport(v as typeof sport)}>
-                <SelectTrigger>
-                  <SelectValue placeholder={t('sport')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="athletics">{t('athletics')}</SelectItem>
-                  <SelectItem value="cycling">{t('cycling')}</SelectItem>
-                  <SelectItem value="other">{t('other')}</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="date"
+                  placeholder="Data de Nascimento"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className="text-xs"
+                />
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                >
+                  <option value="">{t('gender')}...</option>
+                  <option value="M">Masculino</option>
+                  <option value="F">Feminino</option>
+                  <option value="Prefiro não dizer">Outro</option>
+                </select>
+              </div>
+              <Input
+                type="email"
+                placeholder="E-mail"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
               <Input
                 placeholder={`${t('team')} ${t('optional')}`}
                 value={team}
@@ -236,8 +250,8 @@ export default function Athletes() {
                 value={position}
                 onChange={(e) => setPosition(e.target.value)}
               />
-              <Button 
-                className="w-full" 
+              <Button
+                className="w-full"
                 onClick={handleSubmit}
                 disabled={!name.trim() || submitting}
               >
@@ -266,13 +280,6 @@ export default function Athletes() {
                 className="pl-9 bg-background/50"
               />
             </div>
-            <Input
-              placeholder="PV-TCAR"
-              value={pvTcarFilter}
-              onChange={(e) => setPvTcarFilter(e.target.value)}
-              className="w-24 bg-background/50"
-              type="number"
-            />
           </div>
         )}
 
@@ -284,8 +291,8 @@ export default function Athletes() {
             </div>
             <p className="text-muted-foreground">{t('noAthletes')}</p>
             {!showForm && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="mt-4"
                 onClick={() => setShowForm(true)}
               >
@@ -298,109 +305,107 @@ export default function Athletes() {
           <div className="space-y-2">
             {athletes
               .filter(a => {
-                const matchesSearch = a.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                const matchesSearch = a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                   (a.team && a.team.toLowerCase().includes(searchTerm.toLowerCase()));
-                const matchesPvTcar = !pvTcarFilter || (a.pvTcar && a.pvTcar.toString().startsWith(pvTcarFilter));
-                return matchesSearch && matchesPvTcar;
+                return matchesSearch;
               })
               .map((athlete, index) => (
-              <div
-                key={athlete.id}
-                className="glass-card rounded-xl overflow-hidden animate-fade-in"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                {/* Card header */}
-                <div className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                    <User className="w-5 h-5 text-primary-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{athlete.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {getSportLabel(athlete.sport)}
-                      {athlete.position && ` • ${athlete.position}`}
-                      {athlete.pvTcar && ` • PV: ${athlete.pvTcar}`}
-                    </p>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => navigate(`/athlete/${athlete.id}`)}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleEdit(athlete)}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => setDeleteId(athlete.id)}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Expand button */}
-                <button
-                  className="w-full p-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  onClick={() => handleExpand(athlete.id)}
+                <div
+                  key={athlete.id}
+                  className="glass-card rounded-xl overflow-hidden animate-fade-in"
+                  style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  {expandedId === athlete.id ? (
-                    <>{t('collapse')} <ChevronUp className="w-4 h-4" /></>
-                  ) : (
-                    <>{t('viewTests')} <ChevronDown className="w-4 h-4" /></>
-                  )}
-                </button>
-
-                {/* Expanded content */}
-                {expandedId === athlete.id && (
-                  <div className="border-t border-border/50 p-4 bg-secondary/30">
-                    {!athleteTests[athlete.id] ? (
-                      <div className="flex justify-center py-4">
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : athleteTests[athlete.id].length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        {t('noTests')}
+                  {/* Card header */}
+                  <div className="p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                      <User className="w-5 h-5 text-primary-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{athlete.name}</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {athlete.team || 'Sem clube'}
+                        {athlete.position && ` • ${athlete.position}`}
                       </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {athleteTests[athlete.id].slice(0, 5).map(test => (
-                          <div 
-                            key={test.id}
-                            className="flex items-center justify-between p-2 rounded bg-background/50"
-                          >
-                            <span className="text-sm text-muted-foreground">
-                              {test.tests ? formatDate(test.tests.date) : 'Data não disponível'}
-                            </span>
-                            <span className="font-mono font-bold text-primary">
-                              {Number(test.peak_velocity).toFixed(2)} km/h
-                            </span>
-                          </div>
-                        ))}
-                        {athleteTests[athlete.id].length > 5 && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="w-full"
-                            onClick={() => navigate(`/athlete/${athlete.id}`)}
-                          >
-                            {t('viewAll')} ({athleteTests[athlete.id].length})
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => navigate(`/athlete/${athlete.id}`)}
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => handleEdit(athlete)}
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeleteId(athlete.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Expand button */}
+                  <button
+                    className="w-full p-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => handleExpand(athlete.id)}
+                  >
+                    {expandedId === athlete.id ? (
+                      <>{t('collapse')} <ChevronUp className="w-4 h-4" /></>
+                    ) : (
+                      <>{t('viewTests')} <ChevronDown className="w-4 h-4" /></>
+                    )}
+                  </button>
+
+                  {/* Expanded content */}
+                  {expandedId === athlete.id && (
+                    <div className="border-t border-border/50 p-4 bg-secondary/30">
+                      {!athleteTests[athlete.id] ? (
+                        <div className="flex justify-center py-4">
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : athleteTests[athlete.id].length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          {t('noTests')}
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {athleteTests[athlete.id].slice(0, 5).map(test => (
+                            <div
+                              key={test.id}
+                              className="flex items-center justify-between p-2 rounded bg-background/50"
+                            >
+                              <span className="text-sm text-muted-foreground">
+                                {test.test ? formatDate(test.test.date) : 'Data não disponível'}
+                              </span>
+                              <span className="font-mono font-bold text-primary">
+                                {Number(test.pv_corrigido).toFixed(2)} km/h
+                              </span>
+                            </div>
+                          ))}
+                          {athleteTests[athlete.id].length > 5 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => navigate(`/athlete/${athlete.id}`)}
+                            >
+                              {t('viewAll')} ({athleteTests[athlete.id].length})
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
           </div>
         )}
       </div>
