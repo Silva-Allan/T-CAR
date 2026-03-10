@@ -201,11 +201,11 @@ class AudioServiceClass {
       this.instructionAudio = new Audio(audioPath);
       this.instructionAudio.volume = this.volume;
 
-      await new Promise<void>((resolve, reject) => {
-        if (!this.instructionAudio) return reject('No audio element');
+      await new Promise<void>((resolve) => {
+        if (!this.instructionAudio) return resolve();
         this.instructionAudio.addEventListener('canplaythrough', () => resolve(), { once: true });
         this.instructionAudio.addEventListener('error', () => {
-          console.warn('MP3 de instrução não encontrado');
+          console.warn(`[AudioService] Instrução MP3 não encontrada em: ${audioPath}`);
           this.instructionAudio = null;
           resolve();
         }, { once: true });

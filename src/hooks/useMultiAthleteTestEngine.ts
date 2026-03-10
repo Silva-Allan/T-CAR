@@ -37,9 +37,8 @@ const INITIAL_STATE: MultiAthleteTestState = {
 // AUDIO OFFSET: tempo (em segundos) de introdução do MP3 antes do
 // primeiro beep de corrida. O timer do teste começa a contar a partir
 // deste ponto no áudio.
-// Primeiro beep ocorre logo antes do segundo 8 → offset = 7.5s
-// ======================================================================
-const AUDIO_INTRO_OFFSET = 6.3; // seconds — "Teste T-CAR... Repetição 1... Atenção... (beep)"
+// Primeiro beep ocorre logo após o segundo 7.4 → offset = 7.4s
+const AUDIO_INTRO_OFFSET = 7.4; // seconds — "Teste T-CAR... Repetição 1... Atenção... (beep)"
 
 export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athlete[]) {
   const [state, setState] = useState<MultiAthleteTestState>(() => ({
@@ -60,6 +59,8 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
   const startTimeRef = useRef<number>(0);
   const pauseTimeRef = useRef<number>(0);
   const accumulatedPauseRef = useRef<number>(0);
+  const audioStartedRef = useRef<boolean>(false);
+  const beepSyncedRef = useRef<boolean>(false);
 
   // Update protocol values when protocol changes
   useEffect(() => {
@@ -103,6 +104,8 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
 
     startTimeRef.current = Date.now();
     accumulatedPauseRef.current = 0;
+    audioStartedRef.current = false;
+    beepSyncedRef.current = false;
 
     // Start the protocol audio (MP3 with all timed beeps)
     AudioService.startProtocolAudio();
@@ -118,12 +121,45 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
         // =================================================================
         let elapsed: number;
         const audioTime = AudioService.getProtocolAudioTime();
+        // JS Clock also needs to account for the intro offset to be a valid comparison
+        const wallClockElapsedRaw = (Date.now() - startTimeRef.current - accumulatedPauseRef.current) / 1000;
+        const wallClockElapsed = Math.max(0, wallClockElapsedRaw - AUDIO_INTRO_OFFSET);
+
         if (audioTime >= 0) {
+          // SYNC: If this is the first time we detect the audio playing, 
+          // reset the JS clock to be exactly in sync with the audio start.
+          // This eliminates the startup lag from drift logs.
+          if (!audioStartedRef.current && audioTime > 0) {
+            startTimeRef.current = Date.now();
+            accumulatedPauseRef.current = 0;
+            audioStartedRef.current = true;
+            console.log(`[AudioSync] Audio playback detected at ${audioTime.toFixed(2)}s. Syncing JS clock.`);
+          }
+
+          // STAGE 2: Sincronia Rígida no BIPE (7.4s)
+          // Forçamos o relógio JS a bater exatamente 0s de teste quando o áudio chega no offset.
+          if (!beepSyncedRef.current && audioTime >= AUDIO_INTRO_OFFSET) {
+            // Resetamos o startTime para "Agora - Offset" para que wallClockElapsed seja exatamente 0.
+            startTimeRef.current = Date.now() - (AUDIO_INTRO_OFFSET * 1000);
+            accumulatedPauseRef.current = 0;
+            beepSyncedRef.current = true;
+            console.log(`[AudioSync] HARD SYNC: Áudio atingiu ${AUDIO_INTRO_OFFSET}s (BIPE). Cronômetro zerado e sincronizado.`);
+          }
+
           // Audio is playing — use its time as master clock
           elapsed = Math.max(0, audioTime - AUDIO_INTRO_OFFSET);
+
+          // DIAGNOSTIC LOGGING: Check for drift between Audio master and Wall clock
+          // Só logamos drift após o bipe estar sincronizado
+          if (beepSyncedRef.current) {
+            const drift = Math.abs(elapsed - wallClockElapsed);
+            if (drift > 0.1) { // 100ms drift threshold
+              console.log(`[AudioSync] Drift detected: ${(drift * 1000).toFixed(0)}ms. Master=${elapsed.toFixed(2)}s, JS=${wallClockElapsed.toFixed(2)}s`);
+            }
+          }
         } else {
           // Fallback: Date.now() based timer
-          elapsed = (Date.now() - startTimeRef.current - accumulatedPauseRef.current) / 1000;
+          elapsed = wallClockElapsed;
         }
 
         const newElapsedTime = elapsed;
@@ -154,7 +190,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
           currentDistance: CalculatorService.getDistanceAtStage(protocol, currentStage),
         };
       });
-    }, 100);
+    }, 50); // Increased frequency for smoother sync (from 100 to 50ms)
   }, [protocol]);
 
   const pauseTest = useCallback(() => {

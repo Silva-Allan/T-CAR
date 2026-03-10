@@ -64,15 +64,19 @@ class SupabaseServiceClass {
   // ATLETAS
   // ====================================================================
 
-  async getAthletes(): Promise<AthleteRow[]> {
+  async getAthletes(page = 0, pageSize = 20): Promise<AthleteRow[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
+
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
 
     const { data, error } = await supabase
       .from('athletes')
       .select('*')
       .eq('user_id', user.id)
-      .order('name');
+      .order('name')
+      .range(from, to);
 
     if (error) {
       console.error('Erro ao buscar atletas:', error);
@@ -223,15 +227,19 @@ class SupabaseServiceClass {
     return { test, results: results || [] };
   }
 
-  async getTests(): Promise<any[]> {
+  async getTests(page = 0, pageSize = 10): Promise<any[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
+
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
 
     const { data, error } = await supabase
       .from('tests')
       .select('*, test_results(*)')
       .eq('user_id', user.id)
-      .order('date', { ascending: false });
+      .order('date', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('Erro ao buscar testes:', error);
@@ -281,12 +289,16 @@ class SupabaseServiceClass {
   /**
    * Busca histórico de resultados de um atleta específico.
    */
-  async getAthleteTestHistory(athleteId: string): Promise<(TestResultRow & { test: TestRow })[]> {
+  async getAthleteTestHistory(athleteId: string, page = 0, pageSize = 10): Promise<(TestResultRow & { test: TestRow })[]> {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+
     const { data, error } = await supabase
       .from('test_results')
       .select('*, test:tests!inner(*)')
       .eq('athlete_id', athleteId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('Erro ao buscar histórico do atleta:', error);

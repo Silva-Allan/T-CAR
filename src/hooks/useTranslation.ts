@@ -32,6 +32,9 @@ const translations = {
     collapse: 'Recolher',
     noTests: 'Nenhum teste realizado',
     viewAll: 'Ver todos',
+    loadMoreAtletas: 'Carregar mais atletas',
+    loadMoreHistory: 'Carregar mais histórico',
+    loadMore: 'Carregar mais',
     // Select Athletes
     selectAthletesTitle: 'Selecionar Atletas',
     selectInfo: 'Selecione de 1 a 10 atletas',
@@ -99,6 +102,9 @@ const translations = {
     collapse: 'Collapse',
     noTests: 'No tests performed',
     viewAll: 'View all',
+    loadMoreAtletas: 'Load more athletes',
+    loadMoreHistory: 'Load more history',
+    loadMore: 'Load more',
     // Select Athletes
     selectAthletesTitle: 'Select Athletes',
     selectInfo: 'Select 1 to 10 athletes',
@@ -166,6 +172,9 @@ const translations = {
     collapse: 'Colapsar',
     noTests: 'Sin pruebas realizadas',
     viewAll: 'Ver todos',
+    loadMoreAtletas: 'Cargar más atletas',
+    loadMoreHistory: 'Cargar más historial',
+    loadMore: 'Cargar más',
     // Select Athletes
     selectAthletesTitle: 'Seleccionar Atletas',
     selectInfo: 'Seleccione de 1 a 10 atletas',

@@ -3,7 +3,7 @@ import { Gavel, CheckCircle, AlertCircle, Info, Copyright, Scale } from 'lucide-
 
 export default function TermsOfUse() {
     return (
-        <PageContainer title="Termos de Uso" showBack backTo="/about" branded>
+        <PageContainer title="Termos de Uso" showBack branded>
             <div className="max-w-3xl mx-auto space-y-8 pb-12 px-4">
 
                 <div className="text-center space-y-2">

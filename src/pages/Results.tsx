@@ -35,7 +35,7 @@ export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { athletes } = useApp();
+  const { selectedAthletes } = useApp();
   const { toast } = useToast();
   const multiResult = location.state?.multiResult;
 
@@ -72,12 +72,15 @@ export default function Results() {
   // Calcular resultados com FC
   const enrichedResults: AthleteResult[] = useMemo(() => {
     return (multiResult.athleteResults as AthleteResult[]).map(ar => {
-      const athlete = athletes.find(a => a.id === ar.athleteId);
+      const athlete = selectedAthletes.find(a => a.id === ar.athleteId);
       const fcFinalInput = heartRates[ar.athleteId] ? parseInt(heartRates[ar.athleteId]) : null;
+
+      // Suportar tanto birthDate quanto birth_date
+      const bDate = athlete?.birthDate || (athlete as any)?.birth_date;
 
       const fc = CalculatorService.calculateFC(
         fcFinalInput,
-        athlete?.birthDate || undefined
+        bDate || undefined
       );
 
       return {
@@ -86,7 +89,7 @@ export default function Results() {
         fcEstimada: fc.fcEstimada,
       };
     });
-  }, [multiResult.athleteResults, heartRates, athletes]);
+  }, [multiResult.athleteResults, heartRates, selectedAthletes]);
 
   const handleSaveToHistory = async () => {
     if (!user) {
@@ -345,7 +348,7 @@ export default function Results() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="text-right">
-                        <p className="text-xl font-mono font-black text-primary">{ar.pvCorrigido.toFixed(2)}</p>
+                        <p className="text-xl font-mono font-black text-primary">{ar.pvCorrigido.toFixed(1)}</p>
                         <p className="text-[10px] text-muted-foreground">PV corrigido km/h</p>
                       </div>
                       {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> :
@@ -360,7 +363,7 @@ export default function Results() {
                     <div className="grid grid-cols-3 gap-2 text-sm">
                       <div className="text-center">
                         <p className="text-muted-foreground text-xs">PV Bruto</p>
-                        <p className="font-mono font-bold">{ar.pvBruto.toFixed(2)}</p>
+                        <p className="font-mono font-bold">{ar.pvBruto.toFixed(1)}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-muted-foreground text-xs">Total Reps</p>
@@ -388,21 +391,28 @@ export default function Results() {
                     <div className="flex items-center gap-2 bg-background/50 p-2 rounded-lg">
                       <Heart className="w-4 h-4 text-destructive shrink-0" />
                       <span className="text-sm text-muted-foreground shrink-0">FC final:</span>
-                      <Input
-                        type="number"
-                        placeholder="bpm"
-                        className="w-20 h-8 text-center"
-                        value={heartRates[ar.athleteId] || ''}
-                        onChange={(e) => handleHeartRateChange(ar.athleteId, e.target.value)}
-                        disabled={saved}
-                      />
-                      <span className="text-xs text-muted-foreground">
-                        {ar.fcFinal != null
-                          ? `FC: ${ar.fcFinal}`
-                          : ar.fcEstimada != null
-                            ? `Est: ~${ar.fcEstimada}`
-                            : ''}
-                      </span>
+                      <div className="flex-1 flex items-center gap-2">
+                        <Input
+                          type="number"
+                          placeholder="bpm"
+                          className="w-20 h-8 text-center"
+                          value={heartRates[ar.athleteId] || ''}
+                          onChange={(e) => handleHeartRateChange(ar.athleteId, e.target.value)}
+                          disabled={saved}
+                        />
+                        <div className="flex flex-col">
+                          {heartRates[ar.athleteId] ? (
+                            <span className="text-[10px] text-primary font-bold leading-none">FC Medida</span>
+                          ) : ar.fcEstimada != null ? (
+                            <div className="flex flex-col">
+                              <span className="text-[10px] text-amber-600 font-bold leading-none">FC Estimada</span>
+                              <span className="text-[10px] text-muted-foreground">~{ar.fcEstimada} bpm (220-idade)</span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic">FC não informada</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

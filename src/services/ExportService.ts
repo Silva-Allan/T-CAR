@@ -430,9 +430,9 @@ class ExportServiceClass {
             const worstPV = pvValues.length > 0 ? Math.min(...pvValues) : 0;
 
             y = this.drawMetricCard(doc, y, [
-                { label: 'Melhor PV', value: bestPV.toFixed(2), color: UDESC_GREEN },
-                { label: 'Media PV', value: avgPV.toFixed(2), color: UDESC_GREEN },
-                { label: 'Menor PV', value: worstPV.toFixed(2), color: ACCENT_RED },
+                { label: 'Melhor PV', value: bestPV.toFixed(1), color: UDESC_GREEN },
+                { label: 'Media PV', value: avgPV.toFixed(1), color: UDESC_GREEN },
+                { label: 'Menor PV', value: worstPV.toFixed(1), color: ACCENT_RED },
                 { label: 'Total Atletas', value: `${athleteResults.length}`, color: UDESC_GREEN },
             ]);
 
@@ -455,8 +455,8 @@ class ExportServiceClass {
                     return [
                         `${i + 1}`,
                         ar.athleteName.substring(0, 16),
-                        ar.pvCorrigido.toFixed(2),
-                        ar.pvBruto.toFixed(2),
+                        ar.pvCorrigido.toFixed(1),
+                        ar.pvBruto.toFixed(1),
                         fc,
                         `${ar.completedStages}`,
                         `${ar.totalReps}`,
@@ -524,20 +524,20 @@ class ExportServiceClass {
                         ? `${new Date(firstTest!.date).toLocaleDateString('pt-BR')} - ${new Date(lastTest!.date).toLocaleDateString('pt-BR')}`
                         : 'N/A'
                 },
-                { label: 'Melhor PV:', value: best.toFixed(2) },
-                { label: 'Media PV:', value: avg.toFixed(2) },
-                { label: 'Menor PV:', value: worst.toFixed(2) },
+                { label: 'Melhor PV:', value: best.toFixed(1) },
+                { label: 'Media PV:', value: avg.toFixed(1) },
+                { label: 'Menor PV:', value: worst.toFixed(1) },
                 {
                     label: 'Evolucao:', value: tests.length > 1
-                        ? (pvValues[0] - pvValues[pvValues.length - 1] > 0 ? '+' : '') + (pvValues[0] - pvValues[pvValues.length - 1]).toFixed(2)
+                        ? (pvValues[0] - pvValues[pvValues.length - 1] > 0 ? '+' : '') + (pvValues[0] - pvValues[pvValues.length - 1]).toFixed(1)
                         : 'N/A'
                 },
             ], 3);
 
             // Metric Cards
             y = this.drawMetricCard(doc, y, [
-                { label: 'Melhor PV', value: best.toFixed(2), color: UDESC_GREEN },
-                { label: 'Media PV', value: avg.toFixed(2), color: UDESC_GREEN },
+                { label: 'Melhor PV', value: best.toFixed(1), color: UDESC_GREEN },
+                { label: 'Media PV', value: avg.toFixed(1), color: UDESC_GREEN },
                 { label: 'Testes Realizados', value: `${tests.length}`, color: UDESC_GREEN },
             ]);
 
@@ -605,8 +605,8 @@ class ExportServiceClass {
                 `${i + 1}`,
                 new Date(t.date).toLocaleDateString('pt-BR'),
                 `${t.protocolLevel}`,
-                `${t.pvCorrigido.toFixed(2)}`,
-                t.pvBruto != null ? `${t.pvBruto.toFixed(2)}` : '-',
+                `${t.pvCorrigido.toFixed(1)}`,
+                t.pvBruto != null ? `${t.pvBruto.toFixed(1)}` : '-',
                 t.fcFinal != null ? `${t.fcFinal}` : (t.fcEstimada != null ? `~${t.fcEstimada}` : '-'),
                 t.completedStages != null ? `${t.completedStages}` : '-',
                 `${t.totalReps}`,
@@ -655,17 +655,17 @@ class ExportServiceClass {
                 { label: 'Data do Relatorio:', value: new Date().toLocaleDateString('pt-BR') },
                 { label: 'Total de Atletas:', value: `${ranking.length}` },
                 { label: 'Total de Testes:', value: `${totalTests}` },
-                { label: 'Media do Grupo:', value: groupAvg.toFixed(2) },
+                { label: 'Media do Grupo:', value: groupAvg.toFixed(1) },
                 { label: 'Lider:', value: bestAthlete ? bestAthlete.athleteName.split(' ')[0] : 'N/A' },
-                { label: 'PV do Lider:', value: bestAthlete ? bestAthlete.avgPV.toFixed(2) : 'N/A' },
+                { label: 'PV do Lider:', value: bestAthlete ? bestAthlete.avgPV.toFixed(1) : 'N/A' },
             ], 3);
 
             // Stat Cards
             y = this.drawMetricCard(doc, y, [
-                { label: 'Media do Grupo', value: groupAvg.toFixed(2), color: UDESC_GREEN },
+                { label: 'Media do Grupo', value: groupAvg.toFixed(1), color: UDESC_GREEN },
                 { label: 'Atletas', value: `${ranking.length}`, color: UDESC_GREEN },
                 { label: 'Testes', value: `${totalTests}`, color: UDESC_GREEN },
-                { label: 'Lider', value: bestAthlete ? bestAthlete.avgPV.toFixed(2) : '-', color: UDESC_GREEN },
+                { label: 'Lider', value: bestAthlete ? bestAthlete.avgPV.toFixed(1) : '-', color: UDESC_GREEN },
             ]);
 
             // Chart
@@ -682,8 +682,8 @@ class ExportServiceClass {
             const rows = ranking.map(r => [
                 r.position === 1 ? '1º' : r.position === 2 ? '2º' : r.position === 3 ? '3º' : `#${r.position}`,
                 r.athleteName,
-                `${r.avgPV.toFixed(2)} km/h`,
-                `${r.lastPV.toFixed(2)} km/h`,
+                `${r.avgPV.toFixed(1)} km/h`,
+                `${r.lastPV.toFixed(1)} km/h`,
                 `${r.testCount}`,
             ]);
 
@@ -719,7 +719,7 @@ class ExportServiceClass {
         ];
         const rows = athleteResults.map(ar => [
             `"${ar.athleteName}"`, ar.completedStages, ar.completedRepsInLastStage,
-            ar.totalReps, ar.pvBruto.toFixed(2), ar.pvCorrigido.toFixed(2),
+            ar.totalReps, ar.pvBruto.toFixed(1), ar.pvCorrigido.toFixed(1),
             ar.fcFinal ?? '', ar.fcEstimada ?? '', ar.finalDistance,
             ar.eliminatedByFailure ? 'Sim' : 'Não',
         ]);
@@ -742,7 +742,7 @@ class ExportServiceClass {
         ranking: { position: number; athleteName: string; avgPV: number; testCount: number }[]
     ): string {
         const headers = ['Posicao', 'Atleta', 'PV Medio (km/h)', 'Nº Testes'];
-        const rows = ranking.map(r => [`#${r.position}`, `"${r.athleteName}"`, r.avgPV.toFixed(2), r.testCount]);
+        const rows = ranking.map(r => [`#${r.position}`, `"${r.athleteName}"`, r.avgPV.toFixed(1), r.testCount]);
         return [
             [`T-CAR - Ranking do Grupo`].join(','),
             [`Data: ${new Date().toLocaleDateString('pt-BR')}`].join(','),

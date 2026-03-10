@@ -217,7 +217,7 @@ export default function TestDetails() {
                 <div className="text-center bg-primary/10 rounded-lg p-3 mb-3">
                   <p className="text-xs text-muted-foreground mb-1">PV-TCAR</p>
                   <p className="text-3xl font-mono font-black text-primary">
-                    {Number(result.peak_velocity).toFixed(2)}
+                    {Number(result.peak_velocity).toFixed(1)}
                   </p>
                   <p className="text-xs text-muted-foreground">km/h</p>
                 </div>

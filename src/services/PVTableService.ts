@@ -42,21 +42,10 @@ function generatePVTable(
         const stage = Math.floor((rep - 1) / 5) + 1;
         const repInStage = ((rep - 1) % 5) + 1;
 
-        if (stage === 1 && repInStage === 1) {
-            // Primeira rep: velocidade inicial do protocolo
-            table[rep] = Number(initialSpeed.toFixed(1));
-        } else if (repInStage === 1) {
-            // Primeira rep de um novo estágio: velocidade do estágio completo anterior
-            // = initialSpeed + (stage-2) * 0.6 + (5/5) * 0.6
-            // = initialSpeed + (stage-1) * 0.6
-            table[rep] = Number((initialSpeed + (stage - 1) * 0.6).toFixed(1));
-        } else {
-            // Rep parcial dentro do estágio
-            // PV = vel do estágio anterior completo + (repInStage/5) * 0.6
-            const baseVelocity = initialSpeed + (stage - 1) * 0.6;
-            const partialIncrement = (repInStage / 5) * 0.6;
-            table[rep] = Number((baseVelocity + partialIncrement).toFixed(2));
-        }
+        const stageEndVelocity = initialSpeed + (stage - 1) * 0.6;
+        const repVelocity = stageEndVelocity - 0.6 + (repInStage * 0.12);
+
+        table[rep] = Number(repVelocity.toFixed(1));
     }
     return table;
 }

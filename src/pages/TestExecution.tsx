@@ -129,8 +129,33 @@ export default function TestExecution() {
         ? ((state.repElapsedTime - 12) / 6) * 100
         : 0;
 
+  // DIAGNOSTIC: Sync Flash logic
+  const [flash, setFlash] = useState(false);
+  const lastPhaseRef = useRef(state.currentPhase);
+  const lastRepRef = useRef(state.currentRep);
+
+  useEffect(() => {
+    if (state.currentPhase !== lastPhaseRef.current || state.currentRep !== lastRepRef.current) {
+      setFlash(true);
+      const timer = setTimeout(() => setFlash(false), 100);
+      lastPhaseRef.current = state.currentPhase;
+      lastRepRef.current = state.currentRep;
+      return () => clearTimeout(timer);
+    }
+  }, [state.currentPhase, state.currentRep]);
+
   return (
     <PageContainer title="Execução do Teste" hideHeader={state.isStarted}>
+      {/* DIAGNOSTIC: Sync Flash Indicator */}
+      {state.isStarted && (
+        <div
+          className={cn(
+            "fixed top-4 right-4 w-6 h-6 rounded-full border-2 transition-colors duration-75 z-[60]",
+            flash ? "bg-green-500 border-green-400 scale-125" : "bg-transparent border-white/20"
+          )}
+          title="Sync Visual Indicator"
+        />
+      )}
       {/* Audio Permission Modal */}
       {showAudioModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
@@ -277,7 +302,7 @@ export default function TestExecution() {
                   {PVTableService.getCorrectedPV(
                     selectedProtocol.level,
                     PVTableService.calculateTotalReps(state.currentStage - 1, state.currentRep, false)
-                  ).toFixed(2)}
+                  ).toFixed(1)}
                 </p>
               </div>
             )}

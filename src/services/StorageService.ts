@@ -102,7 +102,7 @@ class StorageServiceClass {
     const headers = ['Atleta', 'PV-TCAR', 'Estágios', 'Distância', 'Tempo', 'Data'];
     const rows = results.map(r => [
       r.athleteName,
-      r.peakVelocity.toFixed(2),
+      r.peakVelocity.toFixed(1),
       r.completedStages,
       r.finalDistance,
       r.totalTime.toFixed(0),

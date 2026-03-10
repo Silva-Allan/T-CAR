@@ -21,6 +21,7 @@ export interface Athlete {
   email?: string;
   password?: string; // Para futura versão/login
   birthDate?: string;
+  birth_date?: string; // Compatiblidade com Supabase
   gender?: 'M' | 'F' | 'Prefiro não dizer';
   team?: string;
   position?: string;
@@ -173,4 +174,16 @@ export function calculateAge(birthDate: string): number {
     age--;
   }
   return age;
+}
+
+export function calculateCategory(birthDate: string): string {
+  const age = calculateAge(birthDate);
+  if (age < 7) return 'Kids';
+  if (age <= 11) return 'Sub-11';
+  if (age <= 13) return 'Sub-13';
+  if (age <= 15) return 'Sub-15';
+  if (age <= 17) return 'Sub-17';
+  if (age <= 20) return 'Sub-20';
+  if (age <= 34) return 'Adulto';
+  return 'Master';
 }

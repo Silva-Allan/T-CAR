@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -204,7 +204,7 @@ export default function Auth() {
                 required
               />
               <label htmlFor="terms" className="text-xs text-muted-foreground leading-tight">
-                Eu aceito os <a href="/terms" target="_blank" className="text-primary hover:underline font-bold">Termos de Uso</a> e a <a href="/privacy" target="_blank" className="text-primary hover:underline font-bold">Politica de Privacidade</a>, e confirmo que sou o Controlador dos dados de atletas que virem a ser cadastrados.
+                Eu aceito os <Link to="/terms" className="text-primary hover:underline font-bold">Termos de Uso</Link> e a <Link to="/privacy" className="text-primary hover:underline font-bold">Politica de Privacidade</Link>, e confirmo que sou o Controlador dos dados de atletas que virem a ser cadastrados.
               </label>
             </div>
           )}

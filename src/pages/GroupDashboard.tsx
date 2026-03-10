@@ -67,8 +67,8 @@ export default function GroupDashboard() {
     // Chart data
     const chartData = ranking.map(r => ({
         name: r.athleteName.split(' ')[0], // Primeiro nome
-        pv: Number(r.avgPV.toFixed(2)),
-        lastPV: Number(r.lastPV.toFixed(2)),
+        pv: Number(r.avgPV.toFixed(1)),
+        lastPV: Number(r.lastPV.toFixed(1)),
     }));
 
     const handleExportPDF = async () => {
@@ -161,7 +161,7 @@ export default function GroupDashboard() {
                                             border: '1px solid hsl(var(--border))',
                                             borderRadius: '8px'
                                         }}
-                                        formatter={(value: number) => [`${value.toFixed(2)} km/h`, 'PV Médio']}
+                                        formatter={(value: number) => [`${value.toFixed(1)} km/h`, 'PV Médio']}
                                     />
                                     <Bar dataKey="pv" radius={[0, 4, 4, 0]} name="PV Médio">
                                         {chartData.map((_, index) => (
@@ -227,7 +227,7 @@ export default function GroupDashboard() {
                                                     {ranking[1].athleteName.split(' ')[0]}
                                                 </p>
                                                 <p className="text-lg sm:text-xl font-mono font-bold text-primary">
-                                                    {ranking[1].avgPV.toFixed(2)}
+                                                    {ranking[1].avgPV.toFixed(1)}
                                                 </p>
                                                 <p className="text-[9px] text-muted-foreground">km/h</p>
                                                 {/* Podium block */}
@@ -256,7 +256,7 @@ export default function GroupDashboard() {
                                                     {ranking[0].athleteName.split(' ')[0]}
                                                 </p>
                                                 <p className="text-xl sm:text-2xl font-mono font-bold text-primary">
-                                                    {ranking[0].avgPV.toFixed(2)}
+                                                    {ranking[0].avgPV.toFixed(1)}
                                                 </p>
                                                 <p className="text-[9px] text-muted-foreground">km/h</p>
                                                 {/* Podium block — tallest */}
@@ -283,7 +283,7 @@ export default function GroupDashboard() {
                                                     {ranking[2].athleteName.split(' ')[0]}
                                                 </p>
                                                 <p className="text-lg sm:text-xl font-mono font-bold text-primary">
-                                                    {ranking[2].avgPV.toFixed(2)}
+                                                    {ranking[2].avgPV.toFixed(1)}
                                                 </p>
                                                 <p className="text-[9px] text-muted-foreground">km/h</p>
                                                 {/* Podium block — shortest */}
@@ -336,7 +336,7 @@ export default function GroupDashboard() {
                                                 </div>
                                                 <div className="text-right shrink-0">
                                                     <p className="text-xl font-mono font-bold text-primary">
-                                                        {item.avgPV.toFixed(2)}
+                                                        {item.avgPV.toFixed(1)}
                                                     </p>
                                                     <p className="text-[10px] text-muted-foreground">PV médio</p>
                                                 </div>
@@ -355,7 +355,7 @@ export default function GroupDashboard() {
                                 >
                                     <div className="text-4xl mb-2">🏆</div>
                                     <p className="text-lg font-bold">{ranking[0].athleteName}</p>
-                                    <p className="text-3xl font-mono font-bold text-primary mt-1">{ranking[0].avgPV.toFixed(2)}</p>
+                                    <p className="text-3xl font-mono font-bold text-primary mt-1">{ranking[0].avgPV.toFixed(1)}</p>
                                     <p className="text-xs text-muted-foreground">km/h • {ranking[0].testCount} teste{ranking[0].testCount !== 1 ? 's' : ''}</p>
                                 </div>
                             )}

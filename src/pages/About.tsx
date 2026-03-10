@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ExternalLink, Activity, BookOpen, Download, FileText, Star,
   ChevronDown, ChevronUp, Play, Youtube, Info, Dumbbell, MapPin,
@@ -452,8 +453,8 @@ export default function About() {
             T-CAR App
           </p>
           <div className="flex justify-center gap-4 mt-4">
-            <a href="/privacy" className="text-[10px] font-bold text-primary hover:underline uppercase tracking-tighter">Política de Privacidade</a>
-            <a href="/terms" className="text-[10px] font-bold text-primary hover:underline uppercase tracking-tighter">Termos de Uso</a>
+            <Link to="/privacy" className="text-[10px] font-bold text-primary hover:underline uppercase tracking-tighter">Política de Privacidade</Link>
+            <Link to="/terms" className="text-[10px] font-bold text-primary hover:underline uppercase tracking-tighter">Termos de Uso</Link>
           </div>
         </div>
 

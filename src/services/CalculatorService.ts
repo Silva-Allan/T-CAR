@@ -26,7 +26,7 @@ class CalculatorServiceClass {
     }
 
     const incompleteStageFraction = (completedRepsInLastStage / 5) * 0.6;
-    return Number((lastCompleteStageVelocity + incompleteStageFraction).toFixed(2));
+    return Number((lastCompleteStageVelocity + incompleteStageFraction).toFixed(1));
   }
 
   /**

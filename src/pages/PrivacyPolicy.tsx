@@ -3,7 +3,7 @@ import { Shield, Lock, Eye, Trash2, FileText, Scale } from 'lucide-react';
 
 export default function PrivacyPolicy() {
     return (
-        <PageContainer title="Política de Privacidade" showBack backTo="/about" branded>
+        <PageContainer title="Política de Privacidade" showBack branded>
             <div className="max-w-3xl mx-auto space-y-8 pb-12 px-4">
 
                 <div className="text-center space-y-2">

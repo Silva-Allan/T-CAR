@@ -3,7 +3,10 @@ import { useState, useEffect, useRef } from 'react';
 // Usa o Supabase como alvo do ping com mode:'no-cors'
 // Qualquer resposta (mesmo opaque) = internet funcionando
 // fetch() que lança exceção = sem internet real
-const PING_URL = `${import.meta.env.VITE_SUPABASE_URL ?? 'https://www.google.com'}`;
+const PROJECT_URL = import.meta.env.VITE_SUPABASE_URL ?? 'https://www.google.com';
+const PING_URL = PROJECT_URL.includes('supabase.co')
+    ? `${PROJECT_URL}/rest/v1/`
+    : PROJECT_URL;
 const PING_INTERVAL_MS = 8000; // verifica a cada 8 segundos
 const PING_TIMEOUT_MS = 4000; // timeout de 4 segundos
 

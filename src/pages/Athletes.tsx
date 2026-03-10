@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Plus, User, Trash2, Edit2, X, Check, ChevronDown, ChevronUp, ExternalLink, Loader2, Search } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { SupabaseService } from '@/services/SupabaseService';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
+import { calculateAge, calculateCategory } from '@/models/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,6 +57,10 @@ export default function Athletes() {
   const [position, setPosition] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 20;
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
@@ -63,17 +68,35 @@ export default function Athletes() {
       navigate('/auth');
       return;
     }
-    loadAthletes();
+    loadAthletes(0, true);
   }, [user, navigate]);
 
-  const loadAthletes = async () => {
+  const loadAthletes = async (pageToLoad: number, isInitial = false) => {
+    if (isInitial) setLoading(true);
+    else setLoadingMore(true);
+
     try {
-      const data = await SupabaseService.getAthletes();
-      setAthletes(data as unknown as Athlete[]);
+      const data = await SupabaseService.getAthletes(pageToLoad, PAGE_SIZE);
+
+      if (isInitial) {
+        setAthletes(data as unknown as Athlete[]);
+      } else {
+        setAthletes(prev => [...prev, ...(data as unknown as Athlete[])]);
+      }
+
+      setHasMore(data.length === PAGE_SIZE);
+      setPage(pageToLoad);
     } catch (error) {
       console.error('Error loading athletes:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadAthletes(page + 1);
     }
   };
 
@@ -120,7 +143,7 @@ export default function Athletes() {
           position: position || null,
         });
       }
-      await loadAthletes();
+      await loadAthletes(0, true); // Reload all athletes after add/edit
       resetForm();
     } catch (error) {
       console.error('Error saving athlete:', error);
@@ -213,8 +236,8 @@ export default function Athletes() {
                 Ao cadastrar um atleta, voce atua como <strong>Controlador</strong> e declara possuir o consentimento para o tratamento de seus dados conforme a <strong>LGPD</strong>.
               </p>
               <div className="flex gap-2">
-                <a href="/privacy" target="_blank" className="text-[9px] font-bold text-primary hover:underline uppercase">Privacidade</a>
-                <a href="/terms" target="_blank" className="text-[9px] font-bold text-primary hover:underline uppercase">Termos</a>
+                <Link to="/privacy" className="text-[9px] font-bold text-primary hover:underline uppercase">Privacidade</Link>
+                <Link to="/terms" className="text-[9px] font-bold text-primary hover:underline uppercase">Termos</Link>
               </div>
             </div>
 
@@ -244,6 +267,21 @@ export default function Athletes() {
                   <option value="Prefiro não dizer">Outro</option>
                 </select>
               </div>
+
+              {/* Live Age/Category Preview */}
+              {birthDate && (
+                <div className="flex gap-2 animate-fade-in">
+                  <div className="flex-1 p-2 rounded-lg bg-secondary/50 border border-secondary text-center">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Idade</p>
+                    <p className="text-sm font-bold">{calculateAge(birthDate)} anos</p>
+                  </div>
+                  <div className="flex-1 p-2 rounded-lg bg-primary/10 border border-primary/20 text-center">
+                    <p className="text-[10px] text-primary/70 uppercase font-bold">Categoria</p>
+                    <p className="text-sm font-bold text-primary">{calculateCategory(birthDate)}</p>
+                  </div>
+                </div>
+              )}
+
               <Input
                 type="email"
                 placeholder="E-mail"
@@ -294,7 +332,7 @@ export default function Athletes() {
         )}
 
         {/* Athletes list */}
-        {athletes.length === 0 ? (
+        {athletes.length === 0 && !loading ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-full bg-secondary mx-auto mb-4 flex items-center justify-center">
               <User className="w-8 h-8 text-muted-foreground" />
@@ -316,7 +354,8 @@ export default function Athletes() {
             {athletes
               .filter(a => {
                 const matchesSearch = a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                  (a.team && a.team.toLowerCase().includes(searchTerm.toLowerCase()));
+                  (a.team && a.team.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                  (a.position && a.position.toLowerCase().includes(searchTerm.toLowerCase()));
                 return matchesSearch;
               })
               .map((athlete, index) => (
@@ -332,10 +371,17 @@ export default function Athletes() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{athlete.name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {athlete.team || 'Sem clube'}
-                        {athlete.position && ` • ${athlete.position}`}
-                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-sm text-muted-foreground truncate">
+                          {athlete.position || 'Sem posição'}
+                          {athlete.team && ` • ${athlete.team}`}
+                        </p>
+                        {athlete.birth_date && (
+                          <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground font-medium">
+                            {calculateCategory(athlete.birth_date)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex gap-1">
                       <Button
@@ -396,7 +442,7 @@ export default function Athletes() {
                                 {test.test ? formatDate(test.test.date) : 'Data não disponível'}
                               </span>
                               <span className="font-mono font-bold text-primary">
-                                {Number(test.pv_corrigido).toFixed(2)} km/h
+                                {Number(test.pv_corrigido).toFixed(1)} km/h
                               </span>
                             </div>
                           ))}
@@ -416,6 +462,26 @@ export default function Athletes() {
                   )}
                 </div>
               ))}
+          </div>
+        )}
+
+        {/* Load More Button */}
+        {hasMore && athletes.length > 0 && (
+          <div className="py-4 flex justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="text-primary hover:bg-primary/10"
+            >
+              {loadingMore ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <ChevronDown className="w-4 h-4 mr-2" />
+              )}
+              {t('loadMoreAtletas') || 'Carregar mais atletas'}
+            </Button>
           </div>
         )}
       </div>

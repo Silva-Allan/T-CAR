@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, User, ChevronRight, Users, Loader2, Search } from 'lucide-react';
+import { Plus, User, ChevronRight, Users, Loader2, Search, ChevronDown } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,40 +22,64 @@ export default function SelectAthletes() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { setSelectedAthletes } = useApp();
+  const { t } = useTranslation();
   const [athletes, setAthletes] = useState<ExtendedAthlete[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showNewForm, setShowNewForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
-    loadAthletes();
+    loadAthletes(0, true);
   }, [user, navigate]);
 
-  const loadAthletes = async () => {
+  const loadAthletes = async (pageToLoad: number, isInitial = false) => {
+    if (isInitial) setLoading(true);
+    else setLoadingMore(true);
+
     try {
-      const data = await SupabaseService.getAthletes();
-      // Map Supabase data to Athlete type
+      const data = await SupabaseService.getAthletes(pageToLoad, PAGE_SIZE);
+
       const athletesData: ExtendedAthlete[] = data.map(a => ({
         id: a.id,
+        userId: a.user_id,
         name: a.name,
-        sport: a.sport,
         team: a.team,
         position: a.position,
+        birthDate: a.birth_date || undefined,
         createdAt: a.created_at,
         pvTcar: (a as any).pv_tcar
       }));
-      setAthletes(athletesData);
+
+      if (isInitial) {
+        setAthletes(athletesData);
+      } else {
+        setAthletes(prev => [...prev, ...athletesData]);
+      }
+
+      setHasMore(data.length === PAGE_SIZE);
+      setPage(pageToLoad);
     } catch (error) {
       console.error('Error loading athletes:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadAthletes(page + 1);
     }
   };
 
@@ -79,7 +104,7 @@ export default function SelectAthletes() {
         position: null,
         sport: 'athletics'
       });
-      await loadAthletes();
+      await loadAthletes(0, true);
       setSelectedIds(prev => new Set([...prev, newAthlete.id]));
       setNewName('');
       setShowNewForm(false);
@@ -145,9 +170,9 @@ export default function SelectAthletes() {
                 )}
               </Button>
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="mt-2 w-full"
               onClick={() => setShowNewForm(false)}
             >
@@ -186,50 +211,75 @@ export default function SelectAthletes() {
           <div className="space-y-2">
             <h3 className="text-sm text-muted-foreground px-1">Atletas cadastrados</h3>
             {athletes
-              .filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()))
+              .filter(a =>
+                a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (a.position && a.position.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                (a.team && a.team.toLowerCase().includes(searchTerm.toLowerCase()))
+              )
               .map((athlete, index) => {
-              const isSelected = selectedIds.has(athlete.id);
-              return (
-                <button
-                  key={athlete.id}
-                  className={cn(
-                    "w-full glass-card p-4 rounded-xl flex items-center gap-3 transition-all animate-fade-in",
-                    isSelected 
-                      ? "bg-primary/20 border-primary/50 ring-2 ring-primary/30" 
-                      : "hover:bg-card/90",
-                    !canAddMore && !isSelected && "opacity-50"
-                  )}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                  onClick={() => handleToggleAthlete(athlete)}
-                  disabled={!canAddMore && !isSelected}
-                >
-                  <div className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
-                    isSelected ? "bg-primary text-primary-foreground" : "bg-secondary"
-                  )}>
-                    {isSelected ? (
-                      <span className="font-bold">{[...selectedIds].indexOf(athlete.id) + 1}</span>
-                    ) : (
-                      <User className="w-5 h-5 text-muted-foreground" />
+                const isSelected = selectedIds.has(athlete.id);
+                return (
+                  <button
+                    key={athlete.id}
+                    className={cn(
+                      "w-full glass-card p-4 rounded-xl flex items-center gap-3 transition-all animate-fade-in",
+                      isSelected
+                        ? "bg-primary/20 border-primary/50 ring-2 ring-primary/30"
+                        : "hover:bg-card/90",
+                      !canAddMore && !isSelected && "opacity-50"
                     )}
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="font-medium">{athlete.name}</p>
-                    {athlete.team && (
-                      <span className="text-sm text-muted-foreground mr-2">{athlete.team}</span>
-                    )}
-                    {athlete.pvTcar && (
-                      <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">PV: {athlete.pvTcar}</span>
-                    )}
-                  </div>
-                  {isSelected && (
-                    <div className="w-6 h-6 rounded-full bg-success flex items-center justify-center">
-                      <ChevronRight className="w-4 h-4 text-white" />
+                    style={{ animationDelay: `${index * 50}ms` }}
+                    onClick={() => handleToggleAthlete(athlete)}
+                    disabled={!canAddMore && !isSelected}
+                  >
+                    <div className={cn(
+                      "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+                      isSelected ? "bg-primary text-primary-foreground" : "bg-secondary"
+                    )}>
+                      {isSelected ? (
+                        <span className="font-bold">{[...selectedIds].indexOf(athlete.id) + 1}</span>
+                      ) : (
+                        <User className="w-5 h-5 text-muted-foreground" />
+                      )}
                     </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="font-medium truncate">{athlete.name}</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {athlete.position || 'Sem posição'}
+                        {athlete.team && ` • ${athlete.team}`}
+                        {athlete.pvTcar && (
+                          <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded italic">PV: {athlete.pvTcar}</span>
+                        )}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <div className="w-6 h-6 rounded-full bg-success flex items-center justify-center">
+                        <ChevronRight className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+
+            {/* Load More Button */}
+            {hasMore && athletes.length > 0 && !searchTerm && (
+              <div className="py-4 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="text-primary hover:bg-primary/10"
+                >
+                  {loadingMore ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 mr-2" />
                   )}
-                </button>
-              );
-            })}
+                  {t('loadMoreAtletas') || 'Carregar mais atletas'}
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-8">

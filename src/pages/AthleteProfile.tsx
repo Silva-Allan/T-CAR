@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   User, TrendingUp, TrendingDown, Minus, Calendar, Trophy, Loader2,
-  Download, Heart, Activity
+  Download, Heart, Activity, ChevronDown
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { SupabaseService } from '@/services/SupabaseService';
 import { ClassificationService } from '@/services/ClassificationService';
 import { ExportService } from '@/services/ExportService';
 import { useAuth } from '@/hooks/useAuth';
+import { calculateAge, calculateCategory } from '@/models/types';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceLine, LabelList, Cell
@@ -42,6 +43,10 @@ export default function AthleteProfile() {
   const [tests, setTests] = useState<TestHistoryItem[]>([]);
   const [trainerProfile, setTrainerProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 10;
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,45 +55,16 @@ export default function AthleteProfile() {
       return;
     }
 
-    const loadData = async () => {
+    const loadInitialData = async () => {
       if (!id) return;
       try {
-        const [athleteData, testsData, profileData] = await Promise.all([
+        const [athleteData, profileData] = await Promise.all([
           SupabaseService.getAthlete(id),
-          SupabaseService.getAthleteTestHistory(id),
           SupabaseService.getProfile(),
         ]);
         setAthlete(athleteData);
         setTrainerProfile(profileData);
-
-        // Debug: log raw data from Supabase to understand the structure
-        if (testsData.length > 0) {
-          console.log('[AthleteProfile] Raw test data sample:', JSON.stringify(testsData[0], null, 2));
-        }
-
-        // Normalize data — handle Supabase returning numeric as string,
-        // and test relation possibly being array or object
-        const normalized: TestHistoryItem[] = (testsData as any[]).map((row: any) => {
-          const testRelation = Array.isArray(row.test) ? row.test[0] : row.test;
-          return {
-            id: row.id,
-            pv_corrigido: parseFloat(row.pv_corrigido) || 0,
-            pv_bruto: parseFloat(row.pv_bruto) || 0,
-            total_reps: parseInt(row.total_reps) || 0,
-            completed_stages: parseInt(row.completed_stages) || 0,
-            fc_final: row.fc_final != null ? parseInt(row.fc_final) : null,
-            fc_estimada: row.fc_estimada != null ? parseInt(row.fc_estimada) : null,
-            final_distance: parseFloat(row.final_distance) || 0,
-            eliminated_by_failure: Boolean(row.eliminated_by_failure),
-            created_at: row.created_at,
-            test: {
-              date: testRelation?.date || row.created_at,
-              protocol_level: parseInt(testRelation?.protocol_level) || 1,
-            },
-          };
-        });
-
-        setTests(normalized);
+        await loadTests(0, true);
       } catch (error) {
         console.error('Error loading athlete:', error);
       } finally {
@@ -96,8 +72,58 @@ export default function AthleteProfile() {
       }
     };
 
-    loadData();
+    loadInitialData();
   }, [id, user, navigate]);
+
+  const loadTests = async (pageToLoad: number, isInitial = false) => {
+    if (!id) return;
+    if (isInitial) setLoading(true);
+    else setLoadingMore(true);
+
+    try {
+      const testsData = await SupabaseService.getAthleteTestHistory(id, pageToLoad, PAGE_SIZE);
+
+      const normalized: TestHistoryItem[] = (testsData as any[]).map((row: any) => {
+        const testRelation = Array.isArray(row.test) ? row.test[0] : row.test;
+        return {
+          id: row.id,
+          pv_corrigido: parseFloat(row.pv_corrigido) || 0,
+          pv_bruto: parseFloat(row.pv_bruto) || 0,
+          total_reps: parseInt(row.total_reps) || 0,
+          completed_stages: parseInt(row.completed_stages) || 0,
+          fc_final: row.fc_final != null ? parseInt(row.fc_final) : null,
+          fc_estimada: row.fc_estimada != null ? parseInt(row.fc_estimada) : null,
+          final_distance: parseFloat(row.final_distance) || 0,
+          eliminated_by_failure: Boolean(row.eliminated_by_failure),
+          created_at: row.created_at,
+          test: {
+            date: testRelation?.date || row.created_at,
+            protocol_level: parseInt(testRelation?.protocol_level) || 1,
+          },
+        };
+      });
+
+      if (isInitial) {
+        setTests(normalized);
+      } else {
+        setTests(prev => [...prev, ...normalized]);
+      }
+
+      setHasMore(normalized.length === PAGE_SIZE);
+      setPage(pageToLoad);
+    } catch (error) {
+      console.error('Error loading history:', error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadTests(page + 1);
+    }
+  };
 
   // Bug fix: date-only strings like '2026-03-01' are parsed as UTC midnight
   // which shows the previous day in Brazil (UTC-3). Fix: use noon local time.
@@ -173,12 +199,12 @@ export default function AthleteProfile() {
         {/* PV Corrigido */}
         <div className="flex justify-between items-center gap-6">
           <span className="text-muted-foreground">PV Corrigido</span>
-          <span className="font-bold text-primary text-sm">{d?.pv?.toFixed(2)} <span className="font-normal text-[10px]">km/h</span></span>
+          <span className="font-bold text-primary text-sm">{d?.pv?.toFixed(1)} <span className="font-normal text-[10px]">km/h</span></span>
         </div>
         {/* PV Bruto */}
         <div className="flex justify-between items-center gap-6">
           <span className="text-muted-foreground">PV Bruto</span>
-          <span className="font-mono text-[11px]">{d?.pvBruto?.toFixed(2)} km/h</span>
+          <span className="font-mono text-[11px]">{d?.pvBruto?.toFixed(1)} km/h</span>
         </div>
         {/* Divider */}
         <div className="h-px bg-border/50" />
@@ -293,9 +319,17 @@ export default function AthleteProfile() {
             {athlete.position && ` • ${athlete.position}`}
           </p>
           {athlete.birth_date && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Nascimento: {formatDate(athlete.birth_date)}
-            </p>
+            <div className="flex justify-center gap-3 mt-2">
+              <span className="text-xs bg-secondary/50 px-2 py-1 rounded-md text-muted-foreground">
+                Nascimento: {formatDate(athlete.birth_date)}
+              </span>
+              <span className="text-xs bg-primary/10 px-2 py-1 rounded-md text-primary font-bold">
+                {calculateAge(athlete.birth_date)} anos
+              </span>
+              <span className="text-xs bg-primary/10 px-2 py-1 rounded-md text-primary font-bold">
+                {calculateCategory(athlete.birth_date)}
+              </span>
+            </div>
           )}
         </div>
 
@@ -324,17 +358,17 @@ export default function AthleteProfile() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard
               label="Melhor PV"
-              value={stats.best.toFixed(2)}
+              value={stats.best.toFixed(1)}
               icon={<Trophy className="w-4 h-4 text-success" />}
             />
             <StatCard
               label="Média PV"
-              value={stats.average.toFixed(2)}
+              value={stats.average.toFixed(1)}
               icon={<Minus className="w-4 h-4" />}
             />
             <StatCard
               label="Menor PV"
-              value={stats.worst.toFixed(2)}
+              value={stats.worst.toFixed(1)}
               icon={<TrendingDown className="w-4 h-4 text-destructive" />}
             />
             <StatCard
@@ -401,7 +435,7 @@ export default function AthleteProfile() {
                       strokeDasharray="5 5"
                       strokeWidth={2}
                       label={{
-                        value: `Média: ${avgPV.toFixed(2)}`,
+                        value: `Média: ${avgPV.toFixed(1)}`,
                         position: 'insideTopRight',
                         fill: 'hsl(var(--destructive))',
                         fontSize: 10,
@@ -479,13 +513,33 @@ export default function AthleteProfile() {
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-mono font-bold text-primary">
-                        {Number(test.pv_corrigido).toFixed(2)}
+                        {Number(test.pv_corrigido).toFixed(1)}
                       </p>
                       <p className="text-[10px] text-muted-foreground">PV corr. km/h</p>
                     </div>
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Load More Button */}
+          {hasMore && tests.length > 0 && (
+            <div className="py-2 flex justify-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="text-primary hover:bg-primary/10"
+              >
+                {loadingMore ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 mr-2" />
+                )}
+                Carregar mais histórico
+              </Button>
             </div>
           )}
         </div>

@@ -43,6 +43,10 @@ export default function History() {
   const { t } = useTranslation();
   const [tests, setTests] = useState<TestWithResults[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 10;
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState('');
@@ -52,18 +56,35 @@ export default function History() {
       navigate('/auth');
       return;
     }
-
-    loadTests();
+    loadTests(0, true);
   }, [user, navigate]);
 
-  const loadTests = async () => {
+  const loadTests = async (pageToLoad: number, isInitial = false) => {
+    if (isInitial) setLoading(true);
+    else setLoadingMore(true);
+
     try {
-      const data = await SupabaseService.getTests();
-      setTests(data as unknown as TestWithResults[]);
+      const data = await SupabaseService.getTests(pageToLoad, PAGE_SIZE);
+
+      if (isInitial) {
+        setTests(data as unknown as TestWithResults[]);
+      } else {
+        setTests(prev => [...prev, ...(data as unknown as TestWithResults[])]);
+      }
+
+      setHasMore(data.length === PAGE_SIZE);
+      setPage(pageToLoad);
     } catch (error) {
       console.error('Error loading tests:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      loadTests(page + 1);
     }
   };
 
@@ -86,7 +107,7 @@ export default function History() {
         new Date(test.date.includes('T') ? test.date : `${test.date}T12:00:00`).toLocaleDateString('pt-BR'),
         result.athlete_name,
         `Nível ${test.protocol_level}`,
-        Number(result.pv_corrigido).toFixed(2),
+        Number(result.pv_corrigido).toFixed(1),
         result.completed_stages.toString(),
         `${result.final_distance}m`,
         result.fc_final?.toString() || (result.fc_estimada ? `~${result.fc_estimada}` : '-')
@@ -266,7 +287,7 @@ export default function History() {
                             </div>
                             <div className="text-right">
                               <p className="font-mono font-bold text-primary">
-                                {Number(result.pv_corrigido).toFixed(2)}
+                                {Number(result.pv_corrigido).toFixed(1)}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {result.fc_final ? `${result.fc_final} bpm` : (result.fc_estimada ? `~${result.fc_estimada} bpm` : 'km/h')}
@@ -278,6 +299,26 @@ export default function History() {
                   )}
                 </div>
               ))}
+
+            {/* Load More Button */}
+            {hasMore && tests.length > 0 && (
+              <div className="py-4 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="text-primary hover:bg-primary/10"
+                >
+                  {loadingMore ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 mr-2" />
+                  )}
+                  {t('loadMoreHistory') || 'Carregar mais histórico'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
