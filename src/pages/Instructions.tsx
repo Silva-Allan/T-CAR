@@ -18,14 +18,13 @@ export default function Instructions() {
         {/* Official Animation Section */}
         <section className="glass-card overflow-hidden rounded-2xl">
           <div className="aspect-video bg-black relative">
-            <video
-              src="/videos/tcar-demo.mp4"
-              className="w-full h-full object-contain"
-              controls
-              preload="metadata"
-              playsInline
+            <iframe
+              src="https://www.youtube.com/embed/pUmj9MsLICo"
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
               title="Animação Oficial do Teste T-CAR"
-            />
+            ></iframe>
           </div>
           <div className="p-4 bg-primary/5 border-t border-border/50">
             <p className="text-sm text-primary font-bold flex items-center gap-2">
