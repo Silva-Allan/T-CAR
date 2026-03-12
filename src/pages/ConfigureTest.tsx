@@ -42,10 +42,10 @@ export default function ConfigureTest() {
   ];
 
   return (
-    <PageContainer 
-      title="Configurar Teste" 
-      showBack 
-      backTo="/select-athlete"
+    <PageContainer
+      title="Configurar Teste"
+      showBack
+      backTo="/select-athletes"
     >
       <div className="max-w-md mx-auto space-y-6">
         {/* Selected athlete info */}
@@ -59,14 +59,14 @@ export default function ConfigureTest() {
         {/* Protocol selection */}
         <div className="space-y-3">
           <h2 className="text-sm text-muted-foreground px-1">Selecione o protocolo</h2>
-          
+
           {protocols.map((protocol) => (
             <button
               key={protocol.level}
               className={cn(
                 "w-full glass-card p-5 rounded-xl text-left transition-all duration-200",
-                selectedLevel === protocol.level 
-                  ? "border-primary bg-primary/5 ring-2 ring-primary/20" 
+                selectedLevel === protocol.level
+                  ? "border-primary bg-primary/5 ring-2 ring-primary/20"
                   : "hover:bg-card/90"
               )}
               onClick={() => setSelectedLevel(protocol.level)}
@@ -78,8 +78,8 @@ export default function ConfigureTest() {
                 </div>
                 <div className={cn(
                   "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors",
-                  selectedLevel === protocol.level 
-                    ? "border-primary bg-primary" 
+                  selectedLevel === protocol.level
+                    ? "border-primary bg-primary"
                     : "border-muted-foreground/30"
                 )}>
                   {selectedLevel === protocol.level && (
@@ -87,7 +87,7 @@ export default function ConfigureTest() {
                   )}
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border/50">
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider">Velocidade</p>

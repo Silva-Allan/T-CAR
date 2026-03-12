@@ -123,7 +123,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
         const audioTime = AudioService.getProtocolAudioTime();
         // JS Clock also needs to account for the intro offset to be a valid comparison
         const wallClockElapsedRaw = (Date.now() - startTimeRef.current - accumulatedPauseRef.current) / 1000;
-        const wallClockElapsed = Math.max(0, wallClockElapsedRaw - AUDIO_INTRO_OFFSET);
+        const wallClockElapsed = wallClockElapsedRaw - AUDIO_INTRO_OFFSET; // Allows negative values
 
         if (audioTime >= 0) {
           // SYNC: If this is the first time we detect the audio playing, 
@@ -147,7 +147,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
           }
 
           // Audio is playing — use its time as master clock
-          elapsed = Math.max(0, audioTime - AUDIO_INTRO_OFFSET);
+          elapsed = audioTime - AUDIO_INTRO_OFFSET;
 
           // DIAGNOSTIC LOGGING: Check for drift between Audio master and Wall clock
           // Só logamos drift após o bipe estar sincronizado
@@ -163,21 +163,33 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
         }
 
         const newElapsedTime = elapsed;
-        const stageElapsedTime = newElapsedTime % protocol.stageDuration;
-        const repElapsedTime = stageElapsedTime % protocol.repDuration;
 
-        const repInStage = Math.floor(stageElapsedTime / protocol.repDuration) + 1;
-        // Each rep is split: 8s going + 8s returning (16s per rep)
-        let phase: 'going' | 'returning' | 'recovery';
-        if (repElapsedTime < 8) {
-          phase = 'going';
-        } else if (repElapsedTime < 16) {
-          phase = 'returning';
+        // If elapsed is negative, we are in the intro phase
+        let phase: 'idle' | 'going' | 'returning' | 'recovery';
+        let repInStage = 1;
+        let currentStage = 1;
+        let repElapsedTime = 0;
+
+        if (newElapsedTime < 0) {
+          phase = 'idle'; // Introductory phase
+          repElapsedTime = 0;
         } else {
-          phase = 'recovery';
-        }
+          const stageElapsedTime = newElapsedTime % protocol.stageDuration;
+          repElapsedTime = stageElapsedTime % protocol.repDuration;
 
-        const currentStage = Math.floor(newElapsedTime / protocol.stageDuration) + 1;
+          repInStage = Math.floor(stageElapsedTime / protocol.repDuration) + 1;
+
+          // Official T-CAR 2.0: 6s going + 6s returning + 6s recovery (18s total per rep)
+          if (repElapsedTime < 6) {
+            phase = 'going';
+          } else if (repElapsedTime < 12) {
+            phase = 'returning';
+          } else {
+            phase = 'recovery';
+          }
+
+          currentStage = Math.floor(newElapsedTime / protocol.stageDuration) + 1;
+        }
 
         return {
           ...prev,

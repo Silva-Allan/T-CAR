@@ -57,7 +57,8 @@ export default function About() {
           </div>
           <h2 className="text-2xl font-black tracking-tight">Teste de Carminatti</h2>
           <p className="text-muted-foreground mt-1 text-sm leading-relaxed max-w-sm mx-auto">
-            Protocolo científico para avaliação da potência e capacidade aeróbica em esportes intermitentes
+            Protocolo de campo para avaliação em conjunto da potência e capacidade aeróbia em esportes intermitentes de equipe, 
+            em especial no futebol brasileiro.
           </p>
           <div className="flex justify-center gap-2 mt-4 flex-wrap">
             <span className="text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-primary/10 text-primary">UDESC</span>
@@ -78,9 +79,15 @@ export default function About() {
               <p className="font-bold">Prof. Dr. Lorival José Carminatti</p>
               <p className="text-xs text-muted-foreground">Doutor em Ciências do Movimento Humano · UFSC</p>
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                Professor do <strong>CEFID/UDESC</strong>, criou o T-CAR em <strong>2004</strong> como protocolo de
-                campo científico, padronizado e acessível para avaliação aeróbica em esportes intermitentes.
-                O teste é amplamente validado e utilizado no futebol profissional brasileiro e internacional.
+                Mestre em Ciências do Movimento Humano pela <strong>Universidade do Estado de Santa Catarina (UDESC)</strong> e 
+                Doutor em Educação Física pela <strong>Universidade Federal de Santa Catarina (UFSC)</strong>.
+                Professor e Pesquisador no Centro de Ciências da Saúde e do Esporte (CEFID/UDESC), 
+                criou o teste <strong>T-CAR</strong> em 2004. Toda a base científica foi desenvolvida junto ao 
+                Laboratório de Pesquisas do Desempenho Humano (LAPEDH) e as validações foram realizadas em parceria com o 
+                Laboratório de Avaliação Física (LAEF) da Universidade Federal de Santa Catarina (UFSC), 
+                gerando ao longo de mais de 20 anos, inúmeras publicações de artigos científicos e tabelas de referência 
+                para classificação do resultado, bem como, uma proposta de prescrição de treinamento de alta intensidade individualizada a 
+                partir do pico de velocidade obtido no teste (PV-TCAR).
               </p>
             </div>
           </div>
@@ -93,12 +100,13 @@ export default function About() {
               <Building2 className="w-6 h-6" />
             </div>
             <div>
-              <p className="font-bold">UDESC — CEFID</p>
+              <p className="font-bold">LAPEDH - CEFID – UDESC</p>
               <p className="text-xs text-muted-foreground">Universidade do Estado de Santa Catarina</p>
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                Toda a base científica do T-CAR é desenvolvida e validada no <strong>Programa de Extensão em
-                  Musculação do CEFID/UDESC</strong>. Publicações, tabelas oficiais e protocolos são de
-                responsabilidade da instituição.
+                Todo o material disponibilizado na homepage do <strong>T-CAR</strong> (manual de utilização, fichas de controle, áudio do protocolo, 
+                animação do teste, tabelas de referência do PV-TCAR para o futebol, publicações científicas e o sistema T-CAR de Treinamento) 
+                foram elaborados e organizados em conjunto pelo <strong>Prof. Dr. Lorival José Carminatti</strong> e o <strong>Mestre Hermínio José d’Avila Neto</strong>. 
+                Contato: carminattilj@gmail.com  
               </p>
             </div>
           </div>
@@ -114,7 +122,7 @@ export default function About() {
               <p className="font-bold">Plataforma Digital Oficial</p>
               <p className="text-xs text-muted-foreground">Parceria Prof. Carminatti × Desenvolvedor</p>
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-                Este sistema é fruto de uma parceria direta entre o <strong>Prof. Lorival Carminatti</strong>
+                Este sistema é fruto de uma parceria direta entre o <strong>Prof. Lorival Carminatti</strong><br />
                 e <strong>Allan Gabriel da Silva</strong>, responsável pela engenharia e desenvolvimento da
                 plataforma digital, com o objetivo de digitalizar e padronizar o protocolo T-CAR para uso
                 profissional em escala.
