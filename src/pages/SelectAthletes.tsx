@@ -126,7 +126,7 @@ export default function SelectAthletes() {
 
   if (loading) {
     return (
-      <PageContainer title="Selecionar Atletas" showBack backTo="/">
+      <PageContainer title={t('selectAthletesTitle')} showBack backTo="/">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -135,28 +135,41 @@ export default function SelectAthletes() {
   }
 
   return (
-    <PageContainer title="Selecionar Atletas" showBack backTo="/">
-      <div className="max-w-md mx-auto space-y-6">
+    <PageContainer title={t('selectAthletesTitle')} showBack backTo="/">
+      <div className="max-w-2xl mx-auto space-y-6">
         {/* Info banner */}
-        <div className="glass-card p-4 rounded-xl bg-primary/10 border-primary/30">
-          <div className="flex items-center gap-3">
-            <Users className="w-6 h-6 text-primary" />
+        <div className="glass-card p-4 rounded-xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <Users className="w-5 h-5 text-primary" />
             <div>
-              <p className="font-medium">Selecione de 1 a 10 atletas</p>
-              <p className="text-sm text-muted-foreground">
-                {selectedIds.size} de {MAX_ATHLETES} selecionados
+              <p className="font-bold text-sm">{t('selectInfo')}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {selectedIds.size} {t('selectedCount')}
               </p>
             </div>
           </div>
+          <Button
+            onClick={() => setShowNewForm(!showNewForm)}
+            variant="ghost"
+            size="sm"
+            className="text-primary hover:text-primary hover:bg-primary/10"
+          >
+            {showNewForm ? t('cancel') : (
+              <>
+                <Plus className="w-4 h-4 mr-1" />
+                {t('quickAdd')}
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Quick add form */}
         {showNewForm ? (
           <div className="glass-card p-4 rounded-xl animate-scale-in">
-            <h3 className="font-semibold mb-3">Novo Atleta</h3>
+            <h3 className="font-semibold mb-3">{t('newAthlete')}</h3>
             <div className="flex gap-2">
               <Input
-                placeholder="Nome do atleta"
+                placeholder={t('athleteNamePlaceholder')}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleQuickAdd()}
@@ -166,7 +179,7 @@ export default function SelectAthletes() {
                 {submitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  'Adicionar'
+                  t('add')
                 )}
               </Button>
             </div>
@@ -176,7 +189,7 @@ export default function SelectAthletes() {
               className="mt-2 w-full"
               onClick={() => setShowNewForm(false)}
             >
-              Cancelar
+              {t('cancel')}
             </Button>
           </div>
         ) : (
@@ -189,7 +202,7 @@ export default function SelectAthletes() {
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
               <Plus className="w-5 h-5 text-primary" />
             </div>
-            <span>Adicionar novo atleta</span>
+            <span>{t('addNewAthlete')}</span>
           </Button>
         )}
 
@@ -198,18 +211,18 @@ export default function SelectAthletes() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar atleta..."
+              placeholder={t('search')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 bg-background/50"
+              className="pl-9"
             />
           </div>
         )}
 
         {/* Athletes list */}
         {athletes.length > 0 ? (
-          <div className="space-y-2">
-            <h3 className="text-sm text-muted-foreground px-1">Atletas cadastrados</h3>
+          <div className="space-y-3 pb-24">
+            <h3 className="text-sm font-bold text-muted-foreground px-1">{t('registeredAthletes')}</h3>
             {athletes
               .filter(a =>
                 a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -244,13 +257,22 @@ export default function SelectAthletes() {
                     </div>
                     <div className="flex-1 text-left min-w-0">
                       <p className="font-medium truncate">{athlete.name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {athlete.position || 'Sem posição'}
-                        {athlete.team && ` • ${athlete.team}`}
-                        {athlete.pvTcar && (
-                          <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded italic">PV: {athlete.pvTcar}</span>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        {athlete.pvTcar ? (
+                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">
+                            {t('pv')}: {Number(athlete.pvTcar).toFixed(1)} km/h
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                            {t('noTests')}
+                          </span>
                         )}
-                      </p>
+                        {athlete.team && (
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                            • {athlete.team}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     {isSelected && (
                       <div className="w-6 h-6 rounded-full bg-success flex items-center justify-center">

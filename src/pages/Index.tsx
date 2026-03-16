@@ -8,13 +8,16 @@ import {
   Info,
   Activity,
   BarChart3,
+  Book,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/store/AppContext';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function Index() {
   const navigate = useNavigate();
   const { initializeAudio, isAudioReady } = useApp();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function Index() {
           <div className="absolute inset-0 rounded-2xl border-2 border-primary/20 animate-ping" />
         </div>
         <h1 className="text-3xl font-black tracking-tight mb-1">T-CAR</h1>
-        <p className="text-sm text-muted-foreground font-medium">Carregando protocolo...</p>
+        <p className="text-sm text-muted-foreground font-medium">{t('loadingProtocol')}</p>
       </div>
     );
   }
@@ -59,14 +62,14 @@ export default function Index() {
             <div>
               <h1 className="text-lg font-black text-white tracking-tight">T-CAR</h1>
               <p className="text-[10px] text-white/50 font-semibold tracking-[0.2em] uppercase">
-                UDESC • Protocolo Oficial
+                {t('officialProtocol')}
               </p>
             </div>
           </div>
 
           <div className="mb-6">
             <p className="text-white/80 text-sm font-medium leading-relaxed">
-              Teste de Carminatti para avaliação de performance aeróbica intermitente
+              {t('tcarDescription')}
             </p>
           </div>
 
@@ -78,7 +81,7 @@ export default function Index() {
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
               <Play className="w-5 h-5 fill-current" />
             </div>
-            Iniciar Teste
+            {t('startTest')}
           </button>
         </div>
       </header>
@@ -89,26 +92,28 @@ export default function Index() {
           <div className="grid grid-cols-2 gap-3">
             <MenuCard
               icon={<Users className="w-5 h-5" />}
-              label="Atletas"
-              description="Gerenciar cadastros"
+              label={t('athletesTitle')}
+              description={t('athletesDesc')}
               onClick={() => navigate('/athletes')}
             />
             <MenuCard
               icon={<BarChart3 className="w-5 h-5" />}
-              label="Dashboard"
-              description="Ranking do grupo"
+              label={t('dashboard')}
+              description={t('rankingDesc')}
               onClick={() => navigate('/group')}
             />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <MenuCard
               icon={<History className="w-5 h-5" />}
-              label="Histórico"
-              description="Testes realizados"
+              label={t('historyTitle')}
+              description={t('historyDesc')}
               onClick={() => navigate('/history')}
             />
             <MenuCard
               icon={<Settings className="w-5 h-5" />}
-              label="Configurações"
-              description="Áudio e conta"
+              label={t('settingsTitle')}
+              description={t('settingsDesc')}
               onClick={() => navigate('/settings')}
             />
           </div>
@@ -121,8 +126,8 @@ export default function Index() {
               <Info className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold">Sobre o T-CAR</p>
-              <p className="text-xs text-muted-foreground">Manual, publicações e downloads</p>
+              <p className="text-sm font-semibold">{t('aboutMenuTitle')}</p>
+              <p className="text-xs text-muted-foreground">{t('aboutMenuDesc')}</p>
             </div>
           </button>
         </div>

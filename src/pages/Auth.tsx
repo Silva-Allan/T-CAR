@@ -4,9 +4,11 @@ import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 
 export default function Auth() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, isLoading, signIn, signUp, resetPassword } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
@@ -86,9 +88,9 @@ export default function Auth() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground text-2xl font-black mb-4">
             T
           </div>
-          <h1 className="text-2xl font-bold">T-CAR App</h1>
+          <h1 className="text-2xl font-bold">{t('authTitle')}</h1>
           <p className="text-muted-foreground">
-            {mode === 'login' ? 'Entre na sua conta' : mode === 'signup' ? 'Crie sua conta' : 'Recuperar senha'}
+            {mode === 'login' ? t('enterAccount') : mode === 'signup' ? t('createAccount') : t('recoverPassword')}
           </p>
         </div>
 
@@ -104,7 +106,7 @@ export default function Auth() {
               )}
               onClick={() => setMode('login')}
             >
-              Entrar
+              {t('loginAction')}
             </button>
             <button
               className={cn(
@@ -115,7 +117,7 @@ export default function Auth() {
               )}
               onClick={() => setMode('signup')}
             >
-              Criar conta
+              {t('signupAction')}
             </button>
           </div>
         )}
@@ -127,7 +129,7 @@ export default function Auth() {
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Nome completo"
+                placeholder={t('fullNamePlaceholder')}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="pl-10"
@@ -139,7 +141,7 @@ export default function Auth() {
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               type="email"
-              placeholder="Email"
+              placeholder={t('emailPlaceholder')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="pl-10"
@@ -152,7 +154,7 @@ export default function Auth() {
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
               <Input
                 type="password"
-                placeholder="Senha"
+                placeholder={t('passwordPlaceholder')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="pl-10"
@@ -171,14 +173,14 @@ export default function Auth() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="rounded border-gray-300 text-primary focus:ring-primary"
                 />
-                Lembrar de mim
+                {t('rememberMe')}
               </label>
               <button
                 type="button"
                 onClick={() => setMode('forgot')}
                 className="text-xs text-primary hover:underline font-medium"
               >
-                Esqueceu a senha?
+                {t('forgotPassword')}
               </button>
             </div>
           )}
@@ -189,7 +191,7 @@ export default function Auth() {
               onClick={() => setMode('login')}
               className="text-xs text-primary hover:underline font-medium px-1"
             >
-              Voltar ao login
+              {t('backToLogin')}
             </button>
           )}
 
@@ -204,7 +206,7 @@ export default function Auth() {
                 required
               />
               <label htmlFor="terms" className="text-xs text-muted-foreground leading-tight">
-                Eu aceito os <Link to="/terms" className="text-primary hover:underline font-bold">Termos de Uso</Link> e a <Link to="/privacy" className="text-primary hover:underline font-bold">Politica de Privacidade</Link>, e confirmo que sou o Controlador dos dados de atletas que virem a ser cadastrados.
+                {t('acceptTerms')} <Link to="/terms" className="text-primary hover:underline font-bold">{t('termsOfUse')}</Link> {t('andThe')} <Link to="/privacy" className="text-primary hover:underline font-bold">{t('privacyPolicy')}</Link>{t('controllerConfirm')}
               </label>
             </div>
           )}
@@ -219,7 +221,7 @@ export default function Auth() {
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                {mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Enviar e-mail'}
+                {mode === 'login' ? t('loginAction') : mode === 'signup' ? t('signupAction') : t('sendEmail')}
                 <ArrowRight className="w-5 h-5 ml-2" />
               </>
             )}

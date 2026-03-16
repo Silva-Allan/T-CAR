@@ -143,7 +143,7 @@ export default function Settings() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <User className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold">Perfil do Treinador</h3>
+                <h3 className="font-semibold">{t('trainerProfileTitle')}</h3>
               </div>
               <p className="text-xs text-muted-foreground truncate max-w-[140px]">{user.email}</p>
             </div>
@@ -151,7 +151,7 @@ export default function Settings() {
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Nome completo"
+                  placeholder={t('fullNamePlaceholder')}
                   value={profileName}
                   onChange={e => setProfileName(e.target.value)}
                   className="pl-9"
@@ -160,7 +160,7 @@ export default function Settings() {
               <div className="relative">
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Clube / Equipe"
+                  placeholder={t('profileClubPlaceholder')}
                   value={profileClub}
                   onChange={e => setProfileClub(e.target.value)}
                   className="pl-9"
@@ -169,7 +169,7 @@ export default function Settings() {
               <div className="relative">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Localização (opcional)"
+                  placeholder={t('profileLocPlaceholder')}
                   value={profileLocation}
                   onChange={e => setProfileLocation(e.target.value)}
                   className="pl-9"
@@ -189,7 +189,7 @@ export default function Settings() {
                   ) : (
                     <Save className="w-4 h-4 mr-2" />
                   )}
-                  {profileSaved ? 'Salvo!' : 'Salvar Perfil'}
+                  {profileSaved ? t('profileSavedAction') : t('saveProfile')}
                 </Button>
                 <Button
                   variant="outline"
@@ -281,10 +281,10 @@ export default function Settings() {
         <div className="glass-card p-5 rounded-xl border-primary/20 space-y-4">
           <div className="flex items-center gap-3">
             <ShieldAlert className="w-5 h-5 text-primary" />
-            <h3 className="font-semibold">Privacidade e Dados (LGPD)</h3>
+            <h3 className="font-semibold">{t('lgpdTitle')}</h3>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Gerencie sua privacidade e seus direitos conforme a Lei Geral de Proteção de Dados.
+            {t('lgpdDesc')}
           </p>
 
           <div className="space-y-2">
@@ -295,7 +295,7 @@ export default function Settings() {
               disabled={isExporting}
             >
               {isExporting ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Download className="w-3.5 h-3.5 mr-2 text-primary" />}
-              Exportar Meus Dados (JSON)
+              {t('exportUserData')}
             </Button>
 
             <Button
@@ -304,7 +304,7 @@ export default function Settings() {
               onClick={() => setShowDeleteDialog(true)}
             >
               <Trash2 className="w-3.5 h-3.5 mr-2" />
-              Excluir Minha Conta e Dados
+              {t('deleteAccount')}
             </Button>
           </div>
         </div>
@@ -332,21 +332,19 @@ export default function Settings() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="glass-card border-destructive/50">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive">Excluir Conta Permanentemente?</AlertDialogTitle>
+            <AlertDialogTitle className="text-destructive">{t('deleteAccountTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação é <strong>irreversível</strong>. Todos os seus atletas registrados,
-              testes realizados e resultados serão excluídos permanentemente de nossos servidores,
-              conforme seu direito ao esquecimento (LGPD).
+              {t('deleteAccountDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteAllData}
               className="bg-destructive hover:bg-destructive/90"
               disabled={isDeleting}
             >
-              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Sim, excluir tudo"}
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : t('deleteAccountConfirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

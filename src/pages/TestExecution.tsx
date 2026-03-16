@@ -8,6 +8,7 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useApp } from '@/store/AppContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useMultiAthleteTestEngine } from '@/hooks/useMultiAthleteTestEngine';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { CalculatorService } from '@/services/CalculatorService';
@@ -15,8 +16,19 @@ import { ScreenLockService } from '@/services/ScreenLockService';
 import { PVTableService } from '@/services/PVTableService';
 import { AudioService } from '@/services/AudioService';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function TestExecution() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { selectedAthletes, selectedProtocol, isAudioReady, initializeAudio } = useApp();
   const isOnline = useOnlineStatus();
@@ -175,7 +187,7 @@ export default function TestExecution() {
   );
 
   return (
-    <PageContainer title="Execução do Teste" hideHeader={state.isStarted}>
+    <PageContainer title={t('testExecution')} hideHeader={state.isStarted}>
       {/* DIAGNOSTIC: Sync Flash Indicator */}
       {state.isStarted && (
         <div
@@ -193,15 +205,15 @@ export default function TestExecution() {
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
               <Volume2 className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-lg font-bold">Permissão de Áudio</h3>
+            <h3 className="text-lg font-bold">{t('audioPermission')}</h3>
             <p className="text-sm text-muted-foreground">
-              O T-CAR precisa reproduzir os BIPs do teste. Toque para ativar.
+              {t('audioPermissionDesc')}
             </p>
             <Button onClick={handleAudioPermission} className="w-full field-button-primary" size="lg">
-              Ativar Áudio e Iniciar
+              {t('activateAudioAndStart')}
             </Button>
             <Button variant="ghost" onClick={() => setShowAudioModal(false)} className="w-full">
-              Cancelar
+              {t('cancel')}
             </Button>
           </div>
         </div>
@@ -209,21 +221,33 @@ export default function TestExecution() {
 
       {/* Interruption Modal */}
       {interruptionDetected && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="glass-card p-6 rounded-2xl max-w-sm w-full space-y-4 text-center">
-            <AlertTriangle className="w-12 h-12 mx-auto text-amber-500" />
-            <h3 className="text-lg font-bold">Teste Pausado</h3>
-            <p className="text-sm text-muted-foreground">
-              Pausado automaticamente — tela saiu de foco.
-            </p>
-            <Button onClick={handleResumeFromInterruption} className="w-full field-button-primary" size="lg">
-              Retomar Teste
-            </Button>
-            <Button variant="destructive" onClick={handleEnd} className="w-full min-h-[3rem]">
-              Finalizar Teste
-            </Button>
-          </div>
-        </div>
+        <AlertDialog open={interruptionDetected} onOpenChange={setInterruptionDetected}>
+          <AlertDialogContent className="glass-card border-destructive/20 max-w-[90vw] rounded-2xl">
+            <AlertDialogHeader>
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+                <AlertTriangle className="w-6 h-6 text-destructive" />
+              </div>
+              <AlertDialogTitle className="text-xl">{t('interruptionDetected')}</AlertDialogTitle>
+              <AlertDialogDescription className="text-base">
+                {t('interruptionDesc')}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogAction
+                className="bg-destructive hover:bg-destructive/90 text-white h-12 rounded-xl"
+                onClick={handleResumeFromInterruption}
+              >
+                {t('resumeTest')}
+              </AlertDialogAction>
+              <AlertDialogCancel
+                className="h-12 rounded-xl"
+                onClick={handleEnd}
+              >
+                {t('endTest')}
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       <div className="space-y-4 max-w-lg mx-auto">
@@ -231,8 +255,8 @@ export default function TestExecution() {
         {!state.isStarted && (
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <span className="badge-udesc">Nível {selectedProtocol.level}</span>
-              <span>{selectedAthletes.length} atleta{selectedAthletes.length > 1 ? 's' : ''}</span>
+              <span className="badge-udesc">{t('level')} {selectedProtocol.level}</span>
+              <span>{selectedAthletes.length} {selectedAthletes.length > 1 ? t('athletesPlural') : t('athleteSingular')}</span>
             </div>
             <div className="flex items-center gap-1 text-muted-foreground">
               {isOnline ? (
@@ -256,7 +280,7 @@ export default function TestExecution() {
           {/* Main Info Display (Replaces Timer) */}
           {state.isStarted && state.elapsedTime < 0 ? (
             <div className="py-8 space-y-4">
-              <span className="text-xs uppercase tracking-[0.2em] font-bold text-white/40">Iniciando em...</span>
+              <span className="text-xs uppercase tracking-[0.2em] font-bold text-white/40">{t('startingIn')}</span>
               <p className="font-mono font-black text-7xl text-primary animate-pulse">
                 {Math.abs(state.elapsedTime).toFixed(1)}s
               </p>
@@ -271,7 +295,7 @@ export default function TestExecution() {
                 <span className={cn(
                   "text-[10px] sm:text-xs uppercase tracking-[0.2em] font-bold mb-1",
                   state.isStarted ? "text-white/40" : "text-muted-foreground"
-                )}>Distância</span>
+                )}>{t('distance')}</span>
                 <div className="flex items-baseline gap-1">
                   <span className={cn(
                     "font-mono font-black tracking-tighter leading-none",
@@ -292,14 +316,14 @@ export default function TestExecution() {
                 <span className={cn(
                   "text-[10px] sm:text-xs uppercase tracking-[0.2em] font-bold mb-1",
                   state.isStarted ? "text-primary/70" : "text-primary/70"
-                )}>Repetição</span>
+                )}>{t('repetition')}</span>
                 <div className="flex flex-col items-center text-primary leading-none">
                   <span className={cn(
                     "font-mono font-black tracking-tighter",
                     state.isStarted ? "text-6xl sm:text-7xl" : "text-5xl sm:text-6xl"
                   )}>{totalAccumulatedReps}</span>
                   <p className="font-bold text-xs sm:text-sm mt-1 opacity-60">
-                    rep. {state.currentRep}/{selectedProtocol.repsPerStage}
+                    {t('rep')} {state.currentRep}/{selectedProtocol.repsPerStage}
                   </p>
                 </div>
               </div>
@@ -318,27 +342,27 @@ export default function TestExecution() {
                     />
                   </div>
                   <span className="block text-[9px] font-black uppercase tracking-widest text-primary animate-pulse">
-                    Preparar
+                    {t('prepare')}
                   </span>
                 </div>
               ) : (
                 <>
                   <PhaseSegment
-                    phase="Ida"
+                    phase={t('going')}
                     isActive={state.currentPhase === 'going'}
                     isDone={['returning', 'recovery'].includes(state.currentPhase)}
                     progress={phaseProgress}
                     color="bg-primary"
                   />
                   <PhaseSegment
-                    phase="Volta"
+                    phase={t('returning')}
                     isActive={state.currentPhase === 'returning'}
                     isDone={['recovery'].includes(state.currentPhase)}
                     progress={phaseProgress}
                     color="bg-blue-500"
                   />
                   <PhaseSegment
-                    phase="Recup."
+                    phase={t('recovery')}
                     isActive={state.currentPhase === 'recovery'}
                     isDone={false}
                     progress={phaseProgress}
@@ -351,19 +375,20 @@ export default function TestExecution() {
 
           {/* Stage & PV Info */}
           <div className="flex justify-between items-end mt-4 px-2 border-t border-white/5 pt-4">
-            <div className="text-left">
-              <p className={cn(
-                "text-[10px] uppercase tracking-[0.15em] font-bold",
-                state.isStarted ? "text-white/30" : "text-muted-foreground"
-              )}>Estágio</p>
-              <p className="text-xl font-mono font-black text-white">{state.currentStage}</p>
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                "w-2 h-2 rounded-full animate-pulse",
+                state.isRunning ? "bg-success" : "bg-warning"
+              )} />
+              <span className="text-sm font-medium">
+                {state.isRunning ? t('statusRunning') : t('statusPaused')}
+              </span>
             </div>
-
             <div className="text-right">
               <p className={cn(
                 "text-[10px] uppercase tracking-[0.15em] font-bold",
                 state.isStarted ? "text-white/30" : "text-muted-foreground"
-              )}>Velocidade</p>
+              )}>{t('speed')}</p>
               <p className="text-xl font-mono font-black text-primary">
                 {state.currentSpeed.toFixed(1)} <span className="text-xs font-bold opacity-50">km/h</span>
               </p>
@@ -377,7 +402,7 @@ export default function TestExecution() {
             "flex justify-center gap-4 text-xs font-medium",
             state.isStarted ? "text-black/50" : "text-muted-foreground"
           )}>
-            <span>Velocidade atual: {state.currentSpeed.toFixed(1)} km/h</span>
+            <span>{t('currentSpeed')}: {state.currentSpeed.toFixed(1)} km/h</span>
           </div>
 
           {state.isRunning && (
@@ -385,7 +410,7 @@ export default function TestExecution() {
               <p className={cn(
                 "text-[10px] uppercase tracking-[0.15em] font-bold",
                 state.isStarted ? "text-black/80" : "text-muted-foreground"
-              )}>PV-TCAR Corrigido</p>
+              )}>{t('correctedPVTCAR')}</p>
               <p className="text-3xl font-mono font-black text-primary mt-0.5">
                 {PVTableService.getCorrectedPV(
                   selectedProtocol.level,
@@ -409,14 +434,14 @@ export default function TestExecution() {
               className="min-h-[3.5rem] flex-shrink-0 px-6"
             >
               <ChevronLeft className="w-5 h-5 mr-1" />
-              Voltar
+              {t('back')}
             </Button>
             <button
               onClick={handleStart}
               className="flex-1 field-button-primary flex items-center justify-center gap-2"
             >
               <Play className="w-5 h-5 fill-current" />
-              Iniciar Teste
+              {t('startTest')}
             </button>
           </>
         ) : (
@@ -427,7 +452,7 @@ export default function TestExecution() {
                 className="flex-1 field-button-primary flex items-center justify-center gap-2"
               >
                 <Play className="w-5 h-5 fill-current" />
-                Retomar
+                {t('resume')}
               </button>
             ) : (
               <Button
@@ -436,7 +461,7 @@ export default function TestExecution() {
                 className="flex-1 min-h-[3.5rem] text-base font-semibold"
               >
                 <Pause className="w-5 h-5 mr-2" />
-                Pausar
+                {t('pause')}
               </Button>
             )}
             <Button
@@ -445,7 +470,7 @@ export default function TestExecution() {
               className="flex-1 min-h-[3.5rem] text-base font-semibold"
             >
               <Square className="w-5 h-5 mr-2" />
-              Finalizar
+              {t('finish')}
             </Button>
           </>
         )}
@@ -457,7 +482,7 @@ export default function TestExecution() {
       {state.isStarted && (
         <div className="space-y-4 pt-6">
           <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Atletas Ativos ({activeAthletes.length})
+            {t('activeAthletes')} ({activeAthletes.length})
           </h3>
           {activeAthletes.map(as => (
             <div
@@ -468,7 +493,7 @@ export default function TestExecution() {
                 <span className="font-semibold text-sm truncate">{as.athleteName}</span>
                 {as.consecutiveFailures > 0 && (
                   <span className="shrink-0 text-[10px] font-bold bg-amber-500/15 text-amber-600 px-2 py-0.5 rounded-md uppercase tracking-widest">
-                    {as.consecutiveFailures}x FALHA
+                    {as.consecutiveFailures}x {t('failure')}
                   </span>
                 )}
               </div>
@@ -486,7 +511,7 @@ export default function TestExecution() {
                   className="h-10 px-4 rounded-xl bg-destructive/10 text-destructive font-bold text-xs flex items-center gap-1.5 hover:bg-destructive/20 active:scale-95 transition-all"
                 >
                   <XCircle className="w-4 h-4" />
-                  Falha
+                  {t('failure')}
                 </button>
               </div>
             </div>
@@ -498,7 +523,7 @@ export default function TestExecution() {
       {eliminatedAthletes.length > 0 && (
         <div className="space-y-2 opacity-60 mt-6">
           <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Eliminados ({eliminatedAthletes.length})
+            {t('eliminated')} ({eliminatedAthletes.length})
           </h3>
           {eliminatedAthletes.map(as => (
             <div
@@ -507,7 +532,7 @@ export default function TestExecution() {
             >
               <span className="text-sm line-through">{as.athleteName}</span>
               <span className="text-[10px] text-destructive font-semibold">
-                Est. {as.eliminatedAtStage} / Rep {as.eliminatedAtRep}
+                {t('stageAbbr')} {as.eliminatedAtStage} / {t('repAbbr')} {as.eliminatedAtRep}
               </span>
             </div>
           ))}
@@ -517,9 +542,9 @@ export default function TestExecution() {
       {/* All eliminated notice */}
       {state.allEliminated && (
         <div className="glass-card p-6 rounded-2xl text-center border-destructive/30 space-y-3 mt-6">
-          <p className="font-bold text-destructive text-lg">Todos eliminados!</p>
+          <p className="font-bold text-destructive text-lg">{t('allEliminated')}</p>
           <button onClick={handleEnd} className="field-button-primary w-full flex items-center justify-center gap-2 h-12">
-            Ver Resultados
+            {t('viewResults')}
           </button>
         </div>
       )}

@@ -14,7 +14,7 @@ import {
   Minus,
   Heart,
   Activity,
-  Trophy, Home, Save, Loader2, FileText, ChevronUp
+  Trophy, Home, Save, Loader2, FileText, ChevronUp, BarChart3, Thermometer
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
@@ -28,12 +28,14 @@ import { ClassificationService } from '@/services/ClassificationService';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 import { AthleteResult } from '@/models/types';
 import { cn } from '@/lib/utils';
 
 export default function Results() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t, lang } = useTranslation();
   const { user } = useAuth();
   const { selectedAthletes } = useApp();
   const { toast } = useToast();
@@ -54,11 +56,11 @@ export default function Results() {
 
   if (!multiResult) {
     return (
-      <PageContainer title="Resultados">
+      <PageContainer title={t('testResults')}>
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Nenhum resultado disponível</p>
+          <p className="text-muted-foreground">{t('noResultsAvailable')}</p>
           <Button onClick={() => navigate('/')} className="mt-4">
-            Voltar ao início
+            {t('backToHome')}
           </Button>
         </div>
       </PageContainer>
@@ -95,8 +97,8 @@ export default function Results() {
     if (!user) {
       toast({
         variant: 'destructive',
-        title: 'Login necessário',
-        description: 'Faça login para salvar testes no histórico.'
+        title: t('loginRequired'),
+        description: t('loginToSaveDesc')
       });
       navigate('/auth');
       return;
@@ -140,17 +142,17 @@ export default function Results() {
         const testId = crypto.randomUUID();
         await SyncService.saveForLaterSync(testId, testData, resultsData);
         toast({
-          title: 'Salvo offline',
-          description: 'O teste será sincronizado quando houver conexão.'
+          title: t('savedOffline'),
+          description: t('offlineSyncDesc')
         });
       }
 
       setSaved(true);
       toast({
-        title: 'Teste salvo!',
+        title: t('testSaved'),
         description: navigator.onLine
-          ? 'O teste foi salvo no histórico.'
-          : 'O teste será sincronizado quando online.'
+          ? t('testSavedDesc')
+          : t('syncLaterDesc')
       });
     } catch (error: any) {
       const errMsg = error?.message || '';
@@ -160,8 +162,8 @@ export default function Results() {
       if (errMsg === 'AUTH_ERROR') {
         toast({
           variant: 'destructive',
-          title: 'Sessão expirada',
-          description: 'Faça login novamente para salvar.',
+          title: t('sessionExpired'),
+          description: t('reLoginToSave'),
         });
         navigate('/auth');
         setSaving(false);
@@ -198,14 +200,14 @@ export default function Results() {
         );
         setSaved(true);
         toast({
-          title: '📦 Salvo offline',
-          description: 'Sem conexão com o servidor. O teste será sincronizado automaticamente ao reconectar.',
+          title: `📦 ${t('savedOffline')}`,
+          description: t('offlineSavedWaitSync'),
         });
       } catch {
         toast({
           variant: 'destructive',
-          title: 'Erro crítico ao salvar',
-          description: 'Não foi possível salvar o teste nem localmente.',
+          title: t('criticalSaveError'),
+          description: t('criticalSaveErrorDesc'),
         });
       }
     } finally {
@@ -218,7 +220,9 @@ export default function Results() {
       multiResult.protocol.level,
       multiResult.totalTime,
       new Date().toISOString(),
-      enrichedResults
+      enrichedResults,
+      t,
+      lang
     );
     ExportService.downloadCSV(csv, `tcar_teste_${new Date().toISOString().split('T')[0]}.csv`);
   };
@@ -230,6 +234,8 @@ export default function Results() {
         multiResult.totalTime,
         new Date().toISOString(),
         enrichedResults,
+        t,
+        lang,
         {
           team: trainerProfile?.club || undefined,
           temperature: temperature ? parseFloat(temperature) : null
@@ -238,8 +244,8 @@ export default function Results() {
     } catch (error) {
       toast({
         variant: 'destructive',
-        title: 'Erro ao gerar PDF',
-        description: 'Verifique se o pacote jsPDF está instalado.'
+        title: t('pdfExportError'),
+        description: t('pdfLibraryMissing')
       });
     }
   };
@@ -248,41 +254,45 @@ export default function Results() {
   const sortedResults = [...enrichedResults].sort((a, b) => b.pvCorrigido - a.pvCorrigido);
 
   return (
-    <PageContainer title="Resultados">
-      <div className="max-w-md mx-auto space-y-6">
+    <PageContainer title={t('testResults')}>
+      <div className="max-w-lg mx-auto space-y-6 pb-24">
         {/* Success header */}
         <div className="text-center py-4 animate-fade-in">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/20 mb-4">
             <Trophy className="w-8 h-8 text-success" />
           </div>
-          <h2 className="text-2xl font-bold mb-1">Teste Concluído!</h2>
+          <h2 className="text-2xl font-bold mb-1">{t('testCompleted')}</h2>
           <p className="text-muted-foreground">
-            {multiResult.athleteResults.length} atleta{multiResult.athleteResults.length !== 1 ? 's' : ''}
+            {multiResult.athleteResults.length} {multiResult.athleteResults.length !== 1 ? t('athletes') : t('athlete')}
           </p>
         </div>
 
         {/* Test summary */}
-        <div className="grid grid-cols-2 gap-3">
-          <StatCard
-            label="Tempo Total"
-            value={CalculatorService.formatTime(multiResult.totalTime)}
-            icon={<Clock className="w-4 h-4" />}
-          />
-          <StatCard
-            label="Protocolo"
-            value={`Nível ${multiResult.protocol.level}`}
-            icon={<Gauge className="w-4 h-4" />}
-          />
+        <div className="glass-card p-4 rounded-xl space-y-3">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-bold">{t('summaryLabel')}</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-secondary/50 rounded-xl">
+              <p className="text-[10px] uppercase font-bold text-muted-foreground">{t('level')}</p>
+              <p className="text-xl font-mono font-black">{multiResult.protocol.level}</p>
+            </div>
+            <div className="p-3 bg-secondary/50 rounded-xl">
+              <p className="text-[10px] uppercase font-bold text-muted-foreground">{t('totalTime')}</p>
+              <p className="text-xl font-mono font-black">{CalculatorService.formatTime(multiResult.totalTime)}</p>
+            </div>
+          </div>
         </div>
 
         {/* Post-test data entry */}
         <div className="glass-card p-4 rounded-xl space-y-3">
           <h3 className="text-sm font-semibold flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
-            Dados Ambientais
+            {t('environmentalData')}
           </h3>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground shrink-0 text-left">Temperatura:</span>
+            <span className="text-sm text-muted-foreground shrink-0 text-left">{t('temperature')}:</span>
             <div className="flex items-center gap-2">
               <Input
                 type="number"
@@ -299,7 +309,11 @@ export default function Results() {
 
         {/* Individual results — ranked */}
         <div className="space-y-3">
-          <h3 className="font-semibold">Ranking</h3>
+          <div className="flex items-center gap-2">
+            <HistoryIcon className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold">{t('rankingResults')}</h3>
+          </div>
+          <p className="text-xs text-muted-foreground">{t('rankingByPVCorrigido')}</p>
 
           {sortedResults.map((ar, index) => {
             const classification = ClassificationService.getClassification(
@@ -336,11 +350,11 @@ export default function Results() {
                               backgroundColor: `${classification.color}20`,
                               color: classification.color
                             }}>
-                            {classification.label}
+                            {t(classification.label as any)}
                           </span>
                           {ar.eliminatedByFailure && (
                             <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded">
-                              2 falhas
+                              {t('twoFailures')}
                             </span>
                           )}
                         </div>
@@ -349,7 +363,7 @@ export default function Results() {
                     <div className="flex items-center gap-2">
                       <div className="text-right">
                         <p className="text-xl font-mono font-black text-primary">{ar.pvCorrigido.toFixed(1)}</p>
-                        <p className="text-[10px] text-muted-foreground">PV corrigido km/h</p>
+                        <p className="text-[10px] text-muted-foreground">{t('correctedPVUnit')}</p>
                       </div>
                       {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> :
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />}
@@ -362,22 +376,22 @@ export default function Results() {
                   <div className="px-4 pb-4 space-y-3 border-t border-border/50 pt-3">
                     <div className="grid grid-cols-3 gap-2 text-sm">
                       <div className="text-center">
-                        <p className="text-muted-foreground text-xs">PV Bruto</p>
+                        <p className="text-muted-foreground text-xs">{t('rawPV')}</p>
                         <p className="font-mono font-bold">{ar.pvBruto.toFixed(1)}</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-muted-foreground text-xs">Total Reps</p>
+                        <p className="text-muted-foreground text-xs">{t('totalReps')}</p>
                         <p className="font-mono font-bold">{ar.totalReps}</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-muted-foreground text-xs">Distância</p>
+                        <p className="text-muted-foreground text-xs">{t('distance')}</p>
                         <p className="font-mono font-bold">{ar.finalDistance}m</p>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="text-center">
-                        <p className="text-muted-foreground text-xs">Estágios</p>
+                        <p className="text-muted-foreground text-xs">{t('stages')}</p>
                         <p className="font-mono font-bold">{ar.completedStages}</p>
                       </div>
                       <div className="text-center">
@@ -390,7 +404,7 @@ export default function Results() {
                     {/* Heart rate input */}
                     <div className="flex items-center gap-2 bg-background/50 p-2 rounded-lg">
                       <Heart className="w-4 h-4 text-destructive shrink-0" />
-                      <span className="text-sm text-muted-foreground shrink-0">FC final:</span>
+                      <span className="text-sm text-muted-foreground shrink-0">{t('finalHR')}:</span>
                       <div className="flex-1 flex items-center gap-2">
                         <Input
                           type="number"
@@ -402,14 +416,14 @@ export default function Results() {
                         />
                         <div className="flex flex-col">
                           {heartRates[ar.athleteId] ? (
-                            <span className="text-[10px] text-primary font-bold leading-none">FC Medida</span>
+                            <span className="text-[10px] text-primary font-bold leading-none">{t('measuredHR')}</span>
                           ) : ar.fcEstimada != null ? (
                             <div className="flex flex-col">
-                              <span className="text-[10px] text-amber-600 font-bold leading-none">FC Estimada</span>
-                              <span className="text-[10px] text-muted-foreground">~{ar.fcEstimada} bpm (220-idade)</span>
+                              <span className="text-[10px] text-amber-600 font-bold leading-none">{t('estimatedHR')}</span>
+                              <span className="text-[10px] text-muted-foreground">{t('estimatedHRFormula', ar.fcEstimada)}</span>
                             </div>
                           ) : (
-                            <span className="text-[10px] text-muted-foreground italic">FC não informada</span>
+                            <span className="text-[10px] text-muted-foreground italic">{t('hrNotProvided')}</span>
                           )}
                         </div>
                       </div>
@@ -434,7 +448,7 @@ export default function Results() {
             ) : (
               <>
                 <Save className="w-5 h-5 mr-2" />
-                Salvar no Histórico
+                {t('saveToHistory')}
               </>
             )}
           </Button>
@@ -443,7 +457,7 @@ export default function Results() {
         {saved && (
           <div className="text-center text-success flex items-center justify-center gap-2">
             <Trophy className="w-5 h-5" />
-            Teste salvo com sucesso!
+            {t('testSavedSuccessfully')}
           </div>
         )}
 
@@ -469,7 +483,7 @@ export default function Results() {
             onClick={() => navigate('/select-athletes')}
           >
             <RotateCcw className="w-4 h-4 mr-2" />
-            Novo Teste
+            {t('newTest')}
           </Button>
           <Button
             variant="default"
@@ -477,7 +491,7 @@ export default function Results() {
             onClick={() => navigate('/')}
           >
             <Home className="w-4 h-4 mr-2" />
-            Início
+            {t('home')}
           </Button>
         </div>
       </div>

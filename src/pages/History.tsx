@@ -100,13 +100,13 @@ export default function History() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Data', 'Atleta', 'Protocolo', 'PV Corrigido', 'Estágios', 'Distância', 'FC'];
+    const headers = [t('testDate'), t('athleteLabel'), t('protocol'), t('pvCorrigidoLabel'), t('stagesLabel'), t('distanceLabel'), 'FC'];
 
     const rows = tests.flatMap(test =>
       test.test_results.map(result => [
-        new Date(test.date.includes('T') ? test.date : `${test.date}T12:00:00`).toLocaleDateString('pt-BR'),
+        new Date(test.date.includes('T') ? test.date : `${test.date}T12:00:00`).toLocaleDateString(t('dateLocale')),
         result.athlete_name,
-        `Nível ${test.protocol_level}`,
+        `${t('level')} ${test.protocol_level}`,
         Number(result.pv_corrigido).toFixed(1),
         result.completed_stages.toString(),
         `${result.final_distance}m`,
@@ -126,7 +126,7 @@ export default function History() {
     // Append T12:00:00 for date-only strings to avoid UTC midnight timezone shift
     const normalized = dateString.includes('T') ? dateString : `${dateString}T12:00:00`;
     const date = new Date(normalized);
-    return date.toLocaleDateString('pt-BR', {
+    return date.toLocaleDateString(t('dateLocale'), {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -195,7 +195,7 @@ export default function History() {
                       <div>
                         <p className="font-semibold flex items-center gap-2">
                           <Users className="w-4 h-4 text-primary" />
-                          {test.test_results.length} atleta{test.test_results.length !== 1 ? 's' : ''}
+                          {test.test_results.length} {test.test_results.length === 1 ? t('athleteSingular') : t('athletesPlural')}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {formatDate(test.date)}
@@ -281,7 +281,7 @@ export default function History() {
                               <div>
                                 <p className="font-medium text-sm">{result.athlete_name}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {result.completed_stages} estágios • {result.final_distance}m
+                                  {result.completed_stages} {t('stagesLabel')} • {result.final_distance}m
                                 </p>
                               </div>
                             </div>

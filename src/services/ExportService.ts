@@ -25,10 +25,11 @@ class ExportServiceClass {
     // PDF Helpers — Design Aprimorado
     // ====================================================================
 
-    private drawEnhancedHeader(doc: any, title: string, athleteName?: string, team?: string): number {
+    private drawEnhancedHeader(doc: any, title: string, lang: string, athleteName?: string, team?: string): number {
         const pageW = doc.internal.pageSize.getWidth();
         const headerHeight = 50;
-        const currentDate = new Date().toLocaleDateString('pt-BR', {
+        const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
+        const currentDate = new Date().toLocaleDateString(locale, {
             day: '2-digit',
             month: '2-digit',
             year: 'numeric'
@@ -345,16 +346,17 @@ class ExportServiceClass {
         } catch (e) {
             doc.setFontSize(9);
             doc.setTextColor(...TEXT_SECONDARY);
-            doc.text('Grafico nao disponivel', 15 + chartW / 2, y + chartH / 2, { align: 'center' });
+            doc.text('Chart not available', 15 + chartW / 2, y + chartH / 2, { align: 'center' });
         }
 
         return y + chartH + 15;
     }
 
-    private drawEnhancedFooter(doc: any) {
+    private drawEnhancedFooter(doc: any, t: any, lang: string) {
         const pageCount = doc.internal.getNumberOfPages();
-        const currentDate = new Date().toLocaleDateString('pt-BR');
-        const currentTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
+        const currentDate = new Date().toLocaleDateString(locale);
+        const currentTime = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
@@ -379,7 +381,7 @@ class ExportServiceClass {
             // Data e página
             doc.setFont('helvetica', 'normal');
             doc.text(
-                `Pagina ${i}/${pageCount}  |  ${currentTime}  |  ${currentDate}`,
+                `${t('page')} ${i}/${pageCount}  |  ${currentTime}  |  ${currentDate}`,
                 pageW - 15, 287, { align: 'right' }
             );
         }
@@ -394,6 +396,8 @@ class ExportServiceClass {
         totalTime: number,
         date: string,
         athleteResults: AthleteResult[],
+        t: any,
+        lang: string,
         options?: { temperature?: number | null; notes?: string; chartImage?: string | null; team?: string | null }
     ): Promise<void> {
         try {
@@ -401,24 +405,26 @@ class ExportServiceClass {
             const doc = new jsPDF();
 
             // Header aprimorado
-            let y = this.drawEnhancedHeader(doc, 'Relatorio de Teste', undefined, options?.team ?? undefined);
+            let y = this.drawEnhancedHeader(doc, t('reportTest'), lang, undefined, options?.team ?? undefined);
+
+            const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
 
             // Info Box moderno
             const infoItems = [
-                { label: 'Data do Teste:', value: new Date(date.includes('T') ? date : `${date}T12:00:00`).toLocaleDateString('pt-BR') },
-                { label: 'Horário:', value: new Date(date.includes('T') ? date : `${date}T12:00:00`).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) },
-                { label: 'Protocolo:', value: `Nivel ${protocolLevel}` },
-                { label: 'Tempo Total:', value: this.formatTime(totalTime) },
-                { label: 'Atletas:', value: `${athleteResults.length}` },
-                { label: 'Temperatura:', value: options?.temperature ? `${options.temperature}C` : 'N/I' },
+                { label: t('reportTestDate'), value: new Date(date.includes('T') ? date : `${date}T12:00:00`).toLocaleDateString(locale) },
+                { label: t('timeLabel'), value: new Date(date.includes('T') ? date : `${date}T12:00:00`).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) },
+                { label: t('protocolLabel'), value: `${t('level')} ${protocolLevel}` },
+                { label: t('totalTime') + ':', value: this.formatTime(totalTime) },
+                { label: t('athletesLabel'), value: `${athleteResults.length}` },
+                { label: t('temperatureLabel'), value: options?.temperature ? `${options.temperature}°C` : 'N/I' },
             ];
 
             if (options?.team && !athleteResults.length) {
-                infoItems.push({ label: 'Equipe:', value: options.team });
+                infoItems.push({ label: t('teamLabel'), value: options.team });
             }
 
             if (options?.notes) {
-                infoItems.push({ label: 'Observacoes:', value: options.notes.substring(0, 30) + (options.notes.length > 30 ? '...' : '') });
+                infoItems.push({ label: t('notesLabel'), value: options.notes.substring(0, 30) + (options.notes.length > 30 ? '...' : '') });
             }
 
             y = this.drawModernInfoBox(doc, y, infoItems, 3);
@@ -430,28 +436,28 @@ class ExportServiceClass {
             const worstPV = pvValues.length > 0 ? Math.min(...pvValues) : 0;
 
             y = this.drawMetricCard(doc, y, [
-                { label: 'Melhor PV', value: bestPV.toFixed(1), color: UDESC_GREEN },
-                { label: 'Media PV', value: avgPV.toFixed(1), color: UDESC_GREEN },
-                { label: 'Menor PV', value: worstPV.toFixed(1), color: ACCENT_RED },
-                { label: 'Total Atletas', value: `${athleteResults.length}`, color: UDESC_GREEN },
+                { label: t('bestPV'), value: bestPV.toFixed(1), color: UDESC_GREEN },
+                { label: t('avgPV'), value: avgPV.toFixed(1), color: UDESC_GREEN },
+                { label: t('worstPV'), value: worstPV.toFixed(1), color: ACCENT_RED },
+                { label: t('totalAthletes'), value: `${athleteResults.length}`, color: UDESC_GREEN },
             ]);
 
             // Chart
             if (options?.chartImage) {
-                y = this.drawChartWithFrame(doc, y, options.chartImage, 'Distribuição de PV Corrigido');
+                y = this.drawChartWithFrame(doc, y, options.chartImage, t('pvDistribution'));
             }
 
             // Enhanced Table
-            y = this.drawSectionTitleModern(doc, y, 'Resultados Individuais');
+            y = this.drawSectionTitleModern(doc, y, t('individualResults'));
 
-            const headers = ['#', 'Atleta', 'PV Corr.', 'PV Bruto', 'FC', 'Estagios', 'Reps', 'Distancia', 'Status'];
+            const headers = ['#', t('athlete'), t('pvCorr'), t('pvBruto'), t('fcLabel'), t('reportStages'), t('reportReps'), t('reportDistance'), t('status')];
             const colWidths = [8, 38, 20, 20, 18, 16, 14, 18, 13];
 
             const rows = athleteResults
                 .sort((a, b) => b.pvCorrigido - a.pvCorrigido)
                 .map((ar, i) => {
                     const fc = ar.fcFinal != null ? `${ar.fcFinal}` : (ar.fcEstimada != null ? `~${ar.fcEstimada}` : '-');
-                    const statusSymbol = ar.eliminatedByFailure ? 'Elim.' : 'OK';
+                    const statusSymbol = ar.eliminatedByFailure ? t('statusEliminated') : t('statusOK');
                     return [
                         `${i + 1}`,
                         ar.athleteName.substring(0, 16),
@@ -467,11 +473,11 @@ class ExportServiceClass {
 
             y = this.drawEnhancedTable(doc, y, headers, colWidths, rows, {
                 highlightFirst: true,
-                title: 'Ranking por PV Corrigido'
+                title: t('rankingByPVCorrigido')
             });
 
             // Footer
-            this.drawEnhancedFooter(doc);
+            this.drawEnhancedFooter(doc, t, lang);
 
             const fileName = `tcar_teste_${new Date(date).toISOString().split('T')[0]}.pdf`;
             doc.save(fileName);
@@ -494,6 +500,8 @@ class ExportServiceClass {
             completedStages?: number;
             finalDistance?: number;
         }[],
+        t: any,
+        lang: string,
         options?: {
             chartImage?: string | null;
             team?: string | null;
@@ -506,7 +514,8 @@ class ExportServiceClass {
             const doc = new jsPDF();
 
             // Header com nome do atleta e equipe em destaque
-            let y = this.drawEnhancedHeader(doc, 'Historico do Atleta', athleteName, options?.team ?? undefined);
+            let y = this.drawEnhancedHeader(doc, t('reportHistory'), lang, athleteName, options?.team ?? undefined);
+            const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
 
             // Info Box
             const pvValues = tests.map(t => t.pvCorrigido);
@@ -518,17 +527,17 @@ class ExportServiceClass {
             const lastTest = tests.length > 0 ? tests[0] : null;
 
             y = this.drawModernInfoBox(doc, y, [
-                { label: 'Total de Testes:', value: `${tests.length}` },
+                { label: t('totalTests'), value: `${tests.length}` },
                 {
-                    label: 'Periodo:', value: tests.length > 0
-                        ? `${new Date(firstTest!.date).toLocaleDateString('pt-BR')} - ${new Date(lastTest!.date).toLocaleDateString('pt-BR')}`
+                    label: t('period'), value: tests.length > 0
+                        ? `${new Date(firstTest!.date).toLocaleDateString(locale)} - ${new Date(lastTest!.date).toLocaleDateString(locale)}`
                         : 'N/A'
                 },
-                { label: 'Melhor PV:', value: best.toFixed(1) },
-                { label: 'Media PV:', value: avg.toFixed(1) },
-                { label: 'Menor PV:', value: worst.toFixed(1) },
+                { label: t('bestPV') + ':', value: best.toFixed(1) },
+                { label: t('avgPV') + ':', value: avg.toFixed(1) },
+                { label: t('worstPV') + ':', value: worst.toFixed(1) },
                 {
-                    label: 'Evolucao:', value: tests.length > 1
+                    label: t('evolution'), value: tests.length > 1
                         ? (pvValues[0] - pvValues[pvValues.length - 1] > 0 ? '+' : '') + (pvValues[0] - pvValues[pvValues.length - 1]).toFixed(1)
                         : 'N/A'
                 },
@@ -536,9 +545,9 @@ class ExportServiceClass {
 
             // Metric Cards
             y = this.drawMetricCard(doc, y, [
-                { label: 'Melhor PV', value: best.toFixed(1), color: UDESC_GREEN },
-                { label: 'Media PV', value: avg.toFixed(1), color: UDESC_GREEN },
-                { label: 'Testes Realizados', value: `${tests.length}`, color: UDESC_GREEN },
+                { label: t('bestPV'), value: best.toFixed(1), color: UDESC_GREEN },
+                { label: t('avgPV'), value: avg.toFixed(1), color: UDESC_GREEN },
+                { label: t('realizedTests'), value: `${tests.length}`, color: UDESC_GREEN },
             ]);
 
             // Classification Banner (se disponível)
@@ -568,21 +577,21 @@ class ExportServiceClass {
                 doc.setFontSize(8);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(...TEXT_SECONDARY);
-                doc.text('CLASSIFICAÇÃO ATUAL - REGRA T-CAR', 30, y + 10);
+                doc.text(t('currentClassificationRule'), 30, y + 10);
 
                 doc.setFontSize(18);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(r, g, b);
-                doc.text(cl.label, 30, y + 26);
+                doc.text(t(cl.label as any), 30, y + 26);
 
                 doc.setFontSize(9);
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(...TEXT_SECONDARY);
 
-                const percentileText = `Percentil ${cl.percentile}`;
+                const percentileText = `${t('percentile')} ${cl.percentile}`;
                 if (options.lastTestDate) {
-                    const dateStr = new Date(options.lastTestDate).toLocaleDateString('pt-BR');
-                    doc.text(`${percentileText}  |  Ultimo teste: ${dateStr}`, doc.internal.pageSize.getWidth() - 17, y + 26, { align: 'right' });
+                    const dateStr = new Date(options.lastTestDate).toLocaleDateString(locale);
+                    doc.text(`${percentileText}  |  ${t('lastTest')} ${dateStr}`, doc.internal.pageSize.getWidth() - 17, y + 26, { align: 'right' });
                 } else {
                     doc.text(percentileText, doc.internal.pageSize.getWidth() - 17, y + 26, { align: 'right' });
                 }
@@ -592,32 +601,32 @@ class ExportServiceClass {
 
             // Chart
             if (options?.chartImage) {
-                y = this.drawChartWithFrame(doc, y, options.chartImage, 'Evolucao do PV Corrigido');
+                y = this.drawChartWithFrame(doc, y, options.chartImage, t('evolutionPVLabel'));
             }
 
             // Table
-            y = this.drawSectionTitleModern(doc, y, 'Detalhamento dos Testes');
+            y = this.drawSectionTitleModern(doc, y, t('testDetailing'));
 
-            const headers = ['#', 'Data', 'Nivel', 'PV Corrigido', 'PV Bruto', 'FC Final', 'Estagios', 'Reps', 'Distancia'];
+            const headers = ['#', t('testDate'), t('level'), t('pvCorr'), t('pvBruto'), t('fcLabel'), t('reportStages'), t('reportReps'), t('reportDistance')];
             const colWidths = [8, 22, 14, 23, 20, 20, 18, 15, 20];
 
-            const rows = tests.map((t, i) => [
+            const rows = tests.map((t_item, i) => [
                 `${i + 1}`,
-                new Date(t.date).toLocaleDateString('pt-BR'),
-                `${t.protocolLevel}`,
-                `${t.pvCorrigido.toFixed(1)}`,
-                t.pvBruto != null ? `${t.pvBruto.toFixed(1)}` : '-',
-                t.fcFinal != null ? `${t.fcFinal}` : (t.fcEstimada != null ? `~${t.fcEstimada}` : '-'),
-                t.completedStages != null ? `${t.completedStages}` : '-',
-                `${t.totalReps}`,
-                t.finalDistance != null ? `${t.finalDistance}` : '-',
+                new Date(t_item.date).toLocaleDateString(locale),
+                `${t_item.protocolLevel}`,
+                `${t_item.pvCorrigido.toFixed(1)}`,
+                t_item.pvBruto != null ? `${t_item.pvBruto.toFixed(1)}` : '-',
+                t_item.fcFinal != null ? `${t_item.fcFinal}` : (t_item.fcEstimada != null ? `~${t_item.fcEstimada}` : '-'),
+                t_item.completedStages != null ? `${t_item.completedStages}` : '-',
+                `${t_item.totalReps}`,
+                t_item.finalDistance != null ? `${t_item.finalDistance}` : '-',
             ]);
 
             y = this.drawEnhancedTable(doc, y, headers, colWidths, rows, {
-                title: 'Historico completo de testes'
+                title: t('fullTestHistory')
             });
 
-            this.drawEnhancedFooter(doc);
+            this.drawEnhancedFooter(doc, t, lang);
 
             const fileName = `tcar_historico_${athleteName.replace(/\s+/g, '_')}.pdf`;
             doc.save(fileName);
@@ -635,52 +644,57 @@ class ExportServiceClass {
             lastPV: number;
             testCount: number;
         }[],
+        t: any,
+        lang: string,
         options?: { chartImage?: string | null; totalTests?: number; team?: string | null }
     ): Promise<void> {
         try {
             const { default: jsPDF } = await import('jspdf');
             const doc = new jsPDF();
+            const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
 
             // Header
-            let y = this.drawEnhancedHeader(doc, 'Dashboard do Grupo', undefined, options?.team ?? undefined);
+            let y = this.drawEnhancedHeader(doc, t('reportGroup'), lang, undefined, options?.team ?? undefined);
 
             // Info Box
             const totalTests = options?.totalTests || ranking.reduce((s, r) => s + r.testCount, 0);
             const groupAvg = ranking.length > 0
-                ? ranking.reduce((s, r) => s + r.avgPV, 0) / ranking.length
+                ? ranking.reduce((sum, r) => sum + r.avgPV, 0) / ranking.length
                 : 0;
             const bestAthlete = ranking.length > 0 ? ranking[0] : null;
 
             y = this.drawModernInfoBox(doc, y, [
-                { label: 'Data do Relatorio:', value: new Date().toLocaleDateString('pt-BR') },
-                { label: 'Total de Atletas:', value: `${ranking.length}` },
-                { label: 'Total de Testes:', value: `${totalTests}` },
-                { label: 'Media do Grupo:', value: groupAvg.toFixed(1) },
-                { label: 'Lider:', value: bestAthlete ? bestAthlete.athleteName.split(' ')[0] : 'N/A' },
-                { label: 'PV do Lider:', value: bestAthlete ? bestAthlete.avgPV.toFixed(1) : 'N/A' },
+                { label: t('reportDate'), value: new Date().toLocaleDateString(locale) },
+                { label: t('totalAthletes') + ':', value: `${ranking.length}` },
+                { label: t('totalTests'), value: `${totalTests}` },
+                { label: t('groupAvg'), value: groupAvg.toFixed(1) },
+                { label: t('leader'), value: bestAthlete ? bestAthlete.athleteName.split(' ')[0] : 'N/A' },
+                { label: t('leaderPV'), value: bestAthlete ? bestAthlete.avgPV.toFixed(1) : 'N/A' },
             ], 3);
 
             // Stat Cards
             y = this.drawMetricCard(doc, y, [
-                { label: 'Media do Grupo', value: groupAvg.toFixed(1), color: UDESC_GREEN },
-                { label: 'Atletas', value: `${ranking.length}`, color: UDESC_GREEN },
-                { label: 'Testes', value: `${totalTests}`, color: UDESC_GREEN },
-                { label: 'Lider', value: bestAthlete ? bestAthlete.avgPV.toFixed(1) : '-', color: UDESC_GREEN },
+                { label: t('groupAvgStats'), value: groupAvg.toFixed(1), color: UDESC_GREEN },
+                { label: t('athletesLabel').replace(':', ''), value: `${ranking.length}`, color: UDESC_GREEN },
+                { label: t('summaryTests'), value: `${totalTests}`, color: UDESC_GREEN },
+                { label: t('leader').replace(':', ''), value: bestAthlete ? bestAthlete.avgPV.toFixed(1) : '-', color: UDESC_GREEN },
             ]);
 
             // Chart
             if (options?.chartImage) {
-                y = this.drawChartWithFrame(doc, y, options.chartImage, 'Distribuição do PV Medio por Atleta');
+                y = this.drawChartWithFrame(doc, y, options.chartImage, t('pvDistributionAvg'));
             }
 
             // Ranking Table
-            y = this.drawSectionTitleModern(doc, y, 'Ranking Completo');
+            y = this.drawSectionTitleModern(doc, y, t('fullRanking'));
 
-            const headers = ['Posicao', 'Atleta', 'PV Medio', 'Ultimo PV', 'Testes'];
+            const headers = [t('position'), t('athlete'), t('avgPVLabel'), t('lastPVLabel'), t('testCount')];
             const colWidths = [18, 60, 35, 35, 22];
 
             const rows = ranking.map(r => [
-                r.position === 1 ? '1º' : r.position === 2 ? '2º' : r.position === 3 ? '3º' : `#${r.position}`,
+                r.position === 1 ? `1${lang === 'en' ? 'st' : 'º'}` :
+                    r.position === 2 ? `2${lang === 'en' ? 'nd' : 'º'}` :
+                        r.position === 3 ? `3${lang === 'en' ? 'rd' : 'º'}` : `#${r.position}`,
                 r.athleteName,
                 `${r.avgPV.toFixed(1)} km/h`,
                 `${r.lastPV.toFixed(1)} km/h`,
@@ -689,10 +703,10 @@ class ExportServiceClass {
 
             y = this.drawEnhancedTable(doc, y, headers, colWidths, rows, {
                 highlightFirst: true,
-                title: 'Classificação geral por PV médio'
+                title: t('generalClassificationAvg')
             });
 
-            this.drawEnhancedFooter(doc);
+            this.drawEnhancedFooter(doc, t, lang);
 
             const fileName = `tcar_ranking_${new Date().toISOString().split('T')[0]}.pdf`;
             doc.save(fileName);
@@ -710,25 +724,28 @@ class ExportServiceClass {
         protocolLevel: number,
         totalTime: number,
         date: string,
-        athleteResults: AthleteResult[]
+        athleteResults: AthleteResult[],
+        t: any,
+        lang: string
     ): string {
         const headers = [
-            'Atleta', 'Estagios Completos', 'Reps Ultimo Estagio', 'Total Reps',
-            'PV Bruto (km/h)', 'PV Corrigido (km/h)', 'FC Final (bpm)',
-            'FC Estimada (bpm)', 'Distancia (m)', 'Eliminado por Falha',
+            t('athlete'), t('reportStages'), t('repsLabel'), t('totalReps'),
+            `${t('pvBruto')} (km/h)`, `${t('pvCorr')} (km/h)`, `${t('fcFinal')} (bpm)`,
+            `${t('estimatedHR')} (bpm)`, `${t('distance')} (m)`, t('status'),
         ];
         const rows = athleteResults.map(ar => [
             `"${ar.athleteName}"`, ar.completedStages, ar.completedRepsInLastStage,
             ar.totalReps, ar.pvBruto.toFixed(1), ar.pvCorrigido.toFixed(1),
             ar.fcFinal ?? '', ar.fcEstimada ?? '', ar.finalDistance,
-            ar.eliminatedByFailure ? 'Sim' : 'Não',
+            ar.eliminatedByFailure ? t('yes') : t('no'),
         ]);
+        const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
         const metaRows = [
-            [`T-CAR - Relatorio de Teste`],
-            [`Data: ${new Date(date).toLocaleDateString('pt-BR')}`],
-            [`Protocolo: Nivel ${protocolLevel}`],
-            [`Tempo Total: ${this.formatTime(totalTime)}`],
-            [`Atletas: ${athleteResults.length}`],
+            [`T-CAR - ${t('reportTest')}`],
+            [`${t('testDate')} ${new Date(date).toLocaleDateString(locale)}`],
+            [`${t('protocolLabel')}: ${t('level')} ${protocolLevel}`],
+            [`${t('totalTime')}: ${this.formatTime(totalTime)}`],
+            [`${t('athletesLabel')} ${athleteResults.length}`],
             [],
         ];
         return [
@@ -739,14 +756,17 @@ class ExportServiceClass {
     }
 
     exportGroupRankingToCSV(
-        ranking: { position: number; athleteName: string; avgPV: number; testCount: number }[]
+        ranking: { position: number; athleteName: string; avgPV: number; testCount: number }[],
+        t: any,
+        lang: string
     ): string {
-        const headers = ['Posicao', 'Atleta', 'PV Medio (km/h)', 'Nº Testes'];
+        const headers = [t('position'), t('athlete'), `${t('avgPVLabel')} (km/h)`, t('testCount')];
         const rows = ranking.map(r => [`#${r.position}`, `"${r.athleteName}"`, r.avgPV.toFixed(1), r.testCount]);
+        const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
         return [
-            [`T-CAR - Ranking do Grupo`].join(','),
-            [`Data: ${new Date().toLocaleDateString('pt-BR')}`].join(','),
-            [`Total de Atletas: ${ranking.length}`].join(','),
+            [`T-CAR - ${t('reportGroup')}`].join(','),
+            [`${t('reportDate')} ${new Date().toLocaleDateString(locale)}`].join(','),
+            [`${t('totalAthletes')} ${ranking.length}`].join(','),
             '',
             headers.join(','),
             ...rows.map(r => r.join(',')),

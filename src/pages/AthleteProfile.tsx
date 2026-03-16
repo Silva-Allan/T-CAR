@@ -11,6 +11,7 @@ import { SupabaseService } from '@/services/SupabaseService';
 import { ClassificationService } from '@/services/ClassificationService';
 import { ExportService } from '@/services/ExportService';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { calculateAge, calculateCategory } from '@/models/types';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -36,6 +37,7 @@ interface TestHistoryItem {
 }
 
 export default function AthleteProfile() {
+  const { t, lang } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -187,7 +189,7 @@ export default function AthleteProfile() {
     const d = payload[0]?.payload;
     const fcLabel = d?.fc != null
       ? `${d.fc} bpm ${d.fcType === 'estimada' ? '(est.)' : ''}`
-      : 'Não informada';
+      : t('notInformed');
     return (
       <div className="bg-card/95 backdrop-blur-sm border border-primary/30 rounded-2xl shadow-2xl p-4 text-xs min-w-[160px] space-y-2" style={{ boxShadow: '0 0 0 1px hsl(var(--primary)/0.2), 0 8px 32px rgba(0,0,0,0.25)' }}>
         {/* Header */}
@@ -198,12 +200,12 @@ export default function AthleteProfile() {
         </div>
         {/* PV Corrigido */}
         <div className="flex justify-between items-center gap-6">
-          <span className="text-muted-foreground">PV Corrigido</span>
+          <span className="text-muted-foreground">{t('pvCorrigidoLabel')}</span>
           <span className="font-bold text-primary text-sm">{d?.pv?.toFixed(1)} <span className="font-normal text-[10px]">km/h</span></span>
         </div>
         {/* PV Bruto */}
         <div className="flex justify-between items-center gap-6">
-          <span className="text-muted-foreground">PV Bruto</span>
+          <span className="text-muted-foreground">{t('pvBrutoLabel')}</span>
           <span className="font-mono text-[11px]">{d?.pvBruto?.toFixed(1)} km/h</span>
         </div>
         {/* Divider */}
@@ -217,7 +219,7 @@ export default function AthleteProfile() {
         </div>
         {/* Reps */}
         <div className="flex justify-between items-center gap-6">
-          <span className="text-muted-foreground">Repetições</span>
+          <span className="text-muted-foreground">{t('repsLabel')}</span>
           <span className="font-mono text-[11px]">{d?.reps}</span>
         </div>
       </div>
@@ -245,6 +247,8 @@ export default function AthleteProfile() {
           completedStages: t.completed_stages,
           finalDistance: Number(t.final_distance),
         })),
+        t,
+        lang,
         { chartImage, team: (trainerProfile as any)?.club ?? undefined, classification, lastTestDate: lastTest?.test.date ?? undefined }
       );
     } catch (error) {
@@ -284,7 +288,7 @@ export default function AthleteProfile() {
 
   if (loading) {
     return (
-      <PageContainer title="Perfil do Atleta" showBack backTo="/athletes">
+      <PageContainer title={t('athleteProfileTitle')} showBack backTo="/athletes">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -294,11 +298,11 @@ export default function AthleteProfile() {
 
   if (!athlete) {
     return (
-      <PageContainer title="Perfil do Atleta" showBack backTo="/athletes">
+      <PageContainer title={t('athleteProfileTitle')} showBack backTo="/athletes">
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Atleta não encontrado</p>
+          <p className="text-muted-foreground">{t('athleteNotFound')}</p>
           <Button onClick={() => navigate('/athletes')} className="mt-4">
-            Voltar
+            {t('back')}
           </Button>
         </div>
       </PageContainer>
@@ -306,29 +310,30 @@ export default function AthleteProfile() {
   }
 
   return (
-    <PageContainer title="Perfil do Atleta" showBack backTo="/athletes">
+    <PageContainer title={t('athleteProfileTitle')} showBack backTo="/athletes">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Athlete Header */}
-        <div className="glass-card p-6 rounded-xl text-center animate-fade-in">
-          <div className="w-20 h-20 rounded-full bg-primary mx-auto mb-4 flex items-center justify-center">
-            <User className="w-10 h-10 text-primary-foreground" />
+        <div className="glass-card p-6 rounded-xl animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <User className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold leading-none">{athlete.name}</h2>
+              <p className="text-sm text-muted-foreground mt-1">{athlete.team || t('noPosition')}</p>
+            </div>
           </div>
-          <h2 className="text-2xl font-bold mb-1">{athlete.name}</h2>
-          <p className="text-muted-foreground">
-            {athlete.team && athlete.team}
-            {athlete.position && ` • ${athlete.position}`}
-          </p>
           {athlete.birth_date && (
-            <div className="flex justify-center gap-3 mt-2">
-              <span className="text-xs bg-secondary/50 px-2 py-1 rounded-md text-muted-foreground">
-                Nascimento: {formatDate(athlete.birth_date)}
-              </span>
-              <span className="text-xs bg-primary/10 px-2 py-1 rounded-md text-primary font-bold">
-                {calculateAge(athlete.birth_date)} anos
-              </span>
-              <span className="text-xs bg-primary/10 px-2 py-1 rounded-md text-primary font-bold">
-                {calculateCategory(athlete.birth_date)}
-              </span>
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <div className="text-right flex-1">
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{t('age')}</p>
+                <p className="text-sm font-bold">{calculateAge(athlete.birth_date)} {t('years')}</p>
+              </div>
+              <div className="w-px h-8 bg-border" />
+              <div className="text-left flex-1">
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{t('category')}</p>
+                <p className="text-sm font-bold text-primary">{calculateCategory(athlete.birth_date)}</p>
+              </div>
             </div>
           )}
         </div>
@@ -340,15 +345,15 @@ export default function AthleteProfile() {
             borderWidth: '1px',
           }}>
             <Activity className="w-6 h-6 mx-auto mb-2" style={{ color: classification.color }} />
-            <h3 className="text-sm text-muted-foreground mb-1">Classificação Atual</h3>
+            <h3 className="text-sm text-muted-foreground mb-1">{t('currentClassification')}</h3>
             <p className="text-3xl font-bold" style={{ color: classification.color }}>
               {classification.label}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Percentil {classification.percentile} • Nível {lastTest.test.protocol_level}
+              {t('percentile')} {classification.percentile} • {t('level')} {lastTest.test.protocol_level}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Baseado no último teste ({formatDate(lastTest.test.date)})
+              {t('basedOnLastTest').replace('{0}', formatDate(lastTest.test.date))}
             </p>
           </div>
         )}
@@ -357,23 +362,27 @@ export default function AthleteProfile() {
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatCard
-              label="Melhor PV"
+              label={t('bestPVLabel')}
               value={stats.best.toFixed(1)}
               icon={<Trophy className="w-4 h-4 text-success" />}
             />
             <StatCard
-              label="Média PV"
+              label={t('avgPVLabel')}
               value={stats.average.toFixed(1)}
               icon={<Minus className="w-4 h-4" />}
             />
             <StatCard
-              label="Menor PV"
+              label={t('minPVLabel')}
               value={stats.worst.toFixed(1)}
               icon={<TrendingDown className="w-4 h-4 text-destructive" />}
             />
             <StatCard
-              label="Tendência"
-              value={stats.trend === 'up' ? 'Melhora' : stats.trend === 'down' ? 'Queda' : 'Estável'}
+              label={t('trend')}
+              value={
+                stats.trend === 'up' ? t('trendUp') :
+                  stats.trend === 'down' ? t('trendDown') :
+                    t('trendStable')
+              }
               icon={
                 stats.trend === 'up' ? (
                   <TrendingUp className="w-4 h-4 text-success" />
@@ -390,7 +399,7 @@ export default function AthleteProfile() {
         {/* Chart — Barras (testes) + Linha da Média + Labels PV */}
         {chartData.length >= 1 && (
           <div className="glass-card p-4 rounded-xl">
-            <h3 className="font-semibold mb-4">Evolução PV Corrigido</h3>
+            <h3 className="font-semibold">{t('historyEV_PV')}</h3>
             <div className="h-80" ref={chartRef}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
@@ -405,7 +414,15 @@ export default function AthleteProfile() {
                     stroke="hsl(var(--muted-foreground))"
                     fontSize={11}
                   />
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      fontSize: '12px'
+                    }}
+                    formatter={(value: number) => [`${value.toFixed(1)} km/h`, t('pvCorrigidoLabel')]}
+                  />
                   <Bar
                     dataKey="pv"
                     fill="hsl(var(--primary))"
@@ -453,7 +470,7 @@ export default function AthleteProfile() {
           <div className="flex items-center justify-between">
             <h3 className="font-semibold flex items-center gap-2">
               <Calendar className="w-4 h-4" />
-              Histórico ({tests.length})
+              {t('testHistoryTitle')}
             </h3>
             {tests.length > 0 && (
               <div className="flex gap-2">
@@ -471,7 +488,7 @@ export default function AthleteProfile() {
 
           {tests.length === 0 ? (
             <div className="glass-card p-8 rounded-xl text-center">
-              <p className="text-muted-foreground">Nenhum teste realizado</p>
+              <p className="text-muted-foreground">{t('noTestsPerformed')}</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -501,7 +518,7 @@ export default function AthleteProfile() {
                             backgroundColor: `${testClassification.color}20`,
                             color: testClassification.color
                           }}>
-                          {testClassification.label}
+                          {t(testClassification.label as any)}
                         </span>
                         {fc != null && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -509,6 +526,20 @@ export default function AthleteProfile() {
                             {test.fc_final != null ? fc : `~${fc}`} bpm
                           </span>
                         )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="p-1 px-2 rounded-lg bg-background/50 border border-border/50">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">{t('pvBrutoLabel')}</p>
+                        <p className="text-sm font-mono font-bold">{Number(test.pv_bruto).toFixed(1)} <span className="text-[10px] font-normal text-muted-foreground">km/h</span></p>
+                      </div>
+                      <div className="p-1 px-2 rounded-lg bg-background/50 border border-border/50">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">{t('distanceLabel')}</p>
+                        <p className="text-sm font-mono font-bold">{test.final_distance} <span className="text-[10px] font-normal text-muted-foreground">m</span></p>
+                      </div>
+                      <div className="p-1 px-2 rounded-lg bg-background/50 border border-border/50">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">{t('hrLabel')}</p>
+                        <p className="text-sm font-mono font-bold">{test.fc_final || '-'} <span className="text-[10px] font-normal text-muted-foreground">bpm</span></p>
                       </div>
                     </div>
                     <div className="text-right">

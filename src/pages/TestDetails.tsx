@@ -7,7 +7,9 @@ import { StatCard } from '@/components/test/StatCard';
 import { CalculatorService } from '@/services/CalculatorService';
 import { SupabaseService } from '@/services/SupabaseService';
 import { ExportService } from '@/services/ExportService';
+import { ClassificationService } from '@/services/ClassificationService';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 
 interface TestWithResults {
@@ -31,6 +33,7 @@ interface TestWithResults {
 }
 
 export default function TestDetails() {
+  const { t, lang } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -70,7 +73,8 @@ export default function TestDetails() {
   }, [id, user, navigate]);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
+    const locale = (lang as string) === 'en' ? 'en-US' : (lang as string) === 'es' ? 'es-ES' : 'pt-BR';
+    return new Date(dateString).toLocaleDateString(locale, {
       day: '2-digit',
       month: 'long',
       year: 'numeric',
@@ -101,6 +105,8 @@ export default function TestDetails() {
           finalDistance: r.final_distance,
           eliminatedByFailure: r.eliminated_by_failure
         })),
+        t,
+        (lang as string),
         {
           team: trainerProfile?.club || undefined,
           temperature: (test as any).temperature
@@ -115,7 +121,7 @@ export default function TestDetails() {
 
   if (loading) {
     return (
-      <PageContainer title="Detalhes do Teste" showBack backTo="/history">
+      <PageContainer title={t('testDetailsTitle')} showBack backTo="/history">
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -125,11 +131,11 @@ export default function TestDetails() {
 
   if (!test) {
     return (
-      <PageContainer title="Detalhes do Teste" showBack backTo="/history">
+      <PageContainer title={t('testDetailsTitle')} showBack backTo="/history">
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Teste não encontrado</p>
+          <p className="text-muted-foreground">{t('testNotFound')}</p>
           <Button onClick={() => navigate('/history')} className="mt-4">
-            Voltar ao histórico
+            {t('backToHistory')}
           </Button>
         </div>
       </PageContainer>
@@ -137,14 +143,14 @@ export default function TestDetails() {
   }
 
   return (
-    <PageContainer title="Detalhes do Teste" showBack backTo="/history">
+    <PageContainer title={t('testDetailsTitle')} showBack backTo="/history">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center py-4 animate-fade-in">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 mb-4">
             <Trophy className="w-8 h-8 text-primary" />
           </div>
-          <h2 className="text-lg font-semibold">Protocolo Nível {test.protocol_level}</h2>
+          <h2 className="text-lg font-semibold">{t('protocolLabel')} {t('level')} {test.protocol_level}</h2>
           <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
             <Calendar className="w-4 h-4" />
             {formatDate(test.date)}
@@ -158,7 +164,7 @@ export default function TestDetails() {
               className="gap-2"
             >
               {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-              Exportar PDF
+              {t('exportPDF')}
             </Button>
           </div>
         </div>
@@ -166,14 +172,14 @@ export default function TestDetails() {
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3">
           <StatCard
-            label="Tempo Total"
-            value={CalculatorService.formatTime(test.total_time)}
-            icon={<Clock className="w-4 h-4" />}
+            label={t('level')}
+            value={test.protocol_level.toString()}
+            icon={<Gauge className="w-4 h-4 text-primary" />}
           />
           <StatCard
-            label="Atletas"
-            value={test.test_results.length.toString()}
-            icon={<Trophy className="w-4 h-4" />}
+            label={t('totalTime')}
+            value={CalculatorService.formatTime(test.total_time)}
+            icon={<Clock className="w-4 h-4 text-primary" />}
           />
         </div>
 
@@ -186,10 +192,10 @@ export default function TestDetails() {
 
         {/* Athletes Results */}
         <div className="space-y-3">
-          <h3 className="font-semibold">Resultados por Atleta</h3>
+          <h3 className="font-semibold">{t('resultsByAthlete')}</h3>
 
-          {test.test_results
-            .sort((a, b) => b.peak_velocity - a.peak_velocity)
+          {[...test.test_results]
+            .sort((a, b) => ((b as any).peak_velocity) - ((a as any).peak_velocity))
             .map((result, index) => (
               <div
                 key={result.id}
@@ -207,7 +213,7 @@ export default function TestDetails() {
                     <div>
                       <p className="font-medium">{result.athlete_name}</p>
                       {result.eliminated_by_failure && (
-                        <span className="text-xs text-destructive">Eliminado por falhas</span>
+                        <span className="text-xs text-destructive">{t('eliminatedByFailure')}</span>
                       )}
                     </div>
                   </div>
@@ -227,26 +233,40 @@ export default function TestDetails() {
                   <div className="flex items-center gap-2">
                     <Gauge className="w-4 h-4 text-muted-foreground" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Estágios</p>
+                      <p className="text-xs text-muted-foreground">{t('stagesLabel')}</p>
                       <p className="font-mono">{result.completed_stages}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Ruler className="w-4 h-4 text-muted-foreground" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Distância</p>
+                      <p className="text-xs text-muted-foreground">{t('distanceLabel')}</p>
                       <p className="font-mono">{result.final_distance}m</p>
                     </div>
                   </div>
-                  {result.heart_rate && (
+                  <div className="flex flex-col items-start justify-center gap-1">
                     <div className="flex items-center gap-2">
-                      <Heart className="w-4 h-4 text-destructive" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">FC Final</p>
-                        <p className="font-mono">{result.heart_rate} bpm</p>
-                      </div>
+                      <span className="text-xs px-2 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: `${ClassificationService.getClassification(test.protocol_level as 1 | 2, (result as any).pv_corrigido || result.peak_velocity).color}20`,
+                          color: ClassificationService.getClassification(test.protocol_level as 1 | 2, (result as any).pv_corrigido || result.peak_velocity).color
+                        }}>
+                        {t(ClassificationService.getClassification(test.protocol_level as 1 | 2, (result as any).pv_corrigido || result.peak_velocity).label as any)}
+                      </span>
+                      {result.heart_rate && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Heart className="w-3 h-3 text-rose-500" />
+                          {result.heart_rate} bpm
+                        </span>
+                      )}
                     </div>
-                  )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-mono font-bold text-primary">
+                      {((result as any).pv_corrigido || result.peak_velocity).toFixed(1)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">{t('pvCorrected')} km/h</p>
+                  </div>
                 </div>
               </div>
             ))}

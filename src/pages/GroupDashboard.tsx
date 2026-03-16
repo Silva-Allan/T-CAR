@@ -10,6 +10,7 @@ import { SupabaseService } from '@/services/SupabaseService';
 import { ClassificationService } from '@/services/ClassificationService';
 import { ExportService } from '@/services/ExportService';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
@@ -25,6 +26,7 @@ interface RankingItem {
 }
 
 export default function GroupDashboard() {
+    const { t, lang } = useTranslation();
     const navigate = useNavigate();
     const { user } = useAuth();
     const [ranking, setRanking] = useState<RankingItem[]>([]);
@@ -84,7 +86,7 @@ export default function GroupDashboard() {
                 lastPV: r.lastPV,
                 testCount: r.testCount,
             }));
-            await ExportService.exportGroupRankingToPDF(pdfRanking, {
+            await ExportService.exportGroupRankingToPDF(pdfRanking, t, lang, {
                 chartImage,
                 totalTests,
                 team: trainerProfile?.club || undefined
@@ -103,13 +105,13 @@ export default function GroupDashboard() {
             avgPV: r.avgPV,
             testCount: r.testCount,
         }));
-        const csv = ExportService.exportGroupRankingToCSV(csvRanking);
+        const csv = ExportService.exportGroupRankingToCSV(csvRanking, t, lang);
         ExportService.downloadCSV(csv, `tcar_ranking_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
     if (loading) {
         return (
-            <PageContainer title="Dashboard do Grupo" showBack backTo="/">
+            <PageContainer title={t('dashboardTitle')} showBack backTo="/">
                 <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
@@ -118,31 +120,31 @@ export default function GroupDashboard() {
     }
 
     return (
-        <PageContainer title="Dashboard do Grupo" showBack backTo="/">
+        <PageContainer title={t('dashboardTitle')} showBack backTo="/">
             <div className="max-w-2xl mx-auto space-y-6">
                 {/* Summary cards */}
                 <div className="grid grid-cols-3 gap-3">
                     <div className="glass-card p-4 rounded-xl text-center">
                         <Users className="w-5 h-5 mx-auto mb-1 text-primary" />
                         <p className="text-2xl font-bold">{ranking.length}</p>
-                        <p className="text-[10px] text-muted-foreground">Atletas</p>
+                        <p className="text-[10px] text-muted-foreground">{t('summaryAtletas')}</p>
                     </div>
                     <div className="glass-card p-4 rounded-xl text-center">
                         <BarChart3 className="w-5 h-5 mx-auto mb-1 text-primary" />
                         <p className="text-2xl font-bold">{totalTests}</p>
-                        <p className="text-[10px] text-muted-foreground">Testes</p>
+                        <p className="text-[10px] text-muted-foreground">{t('summaryTests')}</p>
                     </div>
                     <div className="glass-card p-4 rounded-xl text-center">
                         <TrendingUp className="w-5 h-5 mx-auto mb-1 text-primary" />
                         <p className="text-2xl font-bold">{groupAvgPV.toFixed(1)}</p>
-                        <p className="text-[10px] text-muted-foreground">PV Médio</p>
+                        <p className="text-[10px] text-muted-foreground">{t('summaryAvgPV')}</p>
                     </div>
                 </div>
 
                 {/* Ranking Chart */}
                 {chartData.length > 0 && (
                     <div className="glass-card p-4 rounded-xl">
-                        <h3 className="font-semibold mb-4">PV Médio Corrigido por Atleta</h3>
+                        <h3 className="font-semibold mb-4">{t('chartTitle')}</h3>
                         <div className="h-64" ref={chartRef}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={chartData} layout="vertical" margin={{ left: 10 }}>
@@ -161,9 +163,9 @@ export default function GroupDashboard() {
                                             border: '1px solid hsl(var(--border))',
                                             borderRadius: '8px'
                                         }}
-                                        formatter={(value: number) => [`${value.toFixed(1)} km/h`, 'PV Médio']}
+                                        formatter={(value: number) => [`${value.toFixed(1)} km/h`, t('chartLegendAvg')]}
                                     />
-                                    <Bar dataKey="pv" radius={[0, 4, 4, 0]} name="PV Médio">
+                                    <Bar dataKey="pv" radius={[0, 4, 4, 0]} name={t('chartLegendAvg')}>
                                         {chartData.map((_, index) => (
                                             <Cell
                                                 key={`cell-${index}`}
@@ -182,7 +184,7 @@ export default function GroupDashboard() {
                     <div className="flex items-center justify-between">
                         <h3 className="font-semibold flex items-center gap-2">
                             <Trophy className="w-4 h-4 text-primary" />
-                            Ranking
+                            {t('podiumTitle')}
                         </h3>
                         {ranking.length > 0 && (
                             <div className="flex gap-2">
@@ -192,7 +194,7 @@ export default function GroupDashboard() {
                                 </Button>
                                 <Button variant="ghost" size="sm" onClick={handleExportPDF} disabled={exporting}>
                                     <FileText className="w-4 h-4 mr-1" />
-                                    {exporting ? 'Gerando...' : 'PDF'}
+                                    {exporting ? t('exportingAction') : 'PDF'}
                                 </Button>
                             </div>
                         )}
@@ -200,9 +202,9 @@ export default function GroupDashboard() {
 
                     {ranking.length === 0 ? (
                         <div className="glass-card p-8 rounded-xl text-center">
-                            <p className="text-muted-foreground">Nenhum teste realizado ainda.</p>
+                            <p className="text-muted-foreground">{t('rankingNoTests')}</p>
                             <p className="text-sm text-muted-foreground mt-1">
-                                Execute testes para ver o ranking do grupo.
+                                {t('rankingNoTestsDesc')}
                             </p>
                         </div>
                     ) : (
@@ -330,7 +332,7 @@ export default function GroupDashboard() {
                                                             {classification.label}
                                                         </span>
                                                         <span className="text-xs text-muted-foreground">
-                                                            {item.testCount} teste{item.testCount !== 1 ? 's' : ''}
+                                                            {item.testCount} {item.testCount !== 1 ? t('summaryTests') : t('test').toLowerCase()}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -338,7 +340,7 @@ export default function GroupDashboard() {
                                                     <p className="text-xl font-mono font-bold text-primary">
                                                         {item.avgPV.toFixed(1)}
                                                     </p>
-                                                    <p className="text-[10px] text-muted-foreground">PV médio</p>
+                                                    <p className="text-[10px] text-muted-foreground">{t('summaryAvgPV')}</p>
                                                 </div>
                                                 <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                                             </div>
@@ -356,7 +358,7 @@ export default function GroupDashboard() {
                                     <div className="text-4xl mb-2">🏆</div>
                                     <p className="text-lg font-bold">{ranking[0].athleteName}</p>
                                     <p className="text-3xl font-mono font-bold text-primary mt-1">{ranking[0].avgPV.toFixed(1)}</p>
-                                    <p className="text-xs text-muted-foreground">km/h • {ranking[0].testCount} teste{ranking[0].testCount !== 1 ? 's' : ''}</p>
+                                    <p className="text-xs text-muted-foreground">km/h • {ranking[0].testCount} {ranking[0].testCount !== 1 ? t('summaryTests') : t('test').toLowerCase()}</p>
                                 </div>
                             )}
                         </div>

@@ -209,124 +209,124 @@ export default function Athletes() {
       title={t('athletesTitle')}
       showBack
       backTo="/"
-      action={
-        !showForm && (
-          <Button size="sm" onClick={() => setShowForm(true)}>
-            <Plus className="w-4 h-4 mr-1" />
-            {t('new')}
-          </Button>
-        )
-      }
     >
-      <div className="max-w-md mx-auto space-y-4">
-        {/* Add/Edit form */}
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder={t('search')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Button onClick={() => setShowForm(!showForm)} size="sm">
+            {showForm ? <X className="w-4 h-4 mr-1" /> : <Plus className="w-4 h-4 mr-1" />}
+            {showForm ? t('cancel') : t('newAthlete')}
+          </Button>
+        </div>
+
         {showForm && (
-          <div className="glass-card p-4 rounded-xl animate-scale-in">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">
-                {editingId ? t('editAthlete') : t('newAthlete')}
-              </h3>
-              <Button variant="ghost" size="icon-sm" onClick={resetForm}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <div className="mb-4 p-3 rounded-lg bg-primary/5 border border-primary/10 space-y-2">
-              <p className="text-[10px] leading-tight text-muted-foreground">
-                Ao cadastrar um atleta, voce atua como <strong>Controlador</strong> e declara possuir o consentimento para o tratamento de seus dados conforme a <strong>LGPD</strong>.
-              </p>
-              <div className="flex gap-2">
-                <Link to="/privacy" className="text-[9px] font-bold text-primary hover:underline uppercase">Privacidade</Link>
-                <Link to="/terms" className="text-[9px] font-bold text-primary hover:underline uppercase">Termos</Link>
+          <div className="glass-card p-5 rounded-xl space-y-4 animate-in slide-in-from-top duration-300">
+            <h3 className="font-semibold">{editingId ? t('editAthlete') : t('addAthlete')}</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">{t('name')}</label>
+                <Input
+                  placeholder={t('athleteNamePlaceholder')}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
               </div>
-            </div>
-
-            <div className="space-y-3">
-              <Input
-                placeholder={`${t('name')} *`}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-              />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">E-mail {t('optional')}</label>
+                <Input
+                  placeholder="atleta@exemplo.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">{t('birthDateLabel')}</label>
                 <Input
                   type="date"
-                  placeholder="Data de Nascimento"
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
-                  className="text-xs"
                 />
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                >
-                  <option value="">{t('gender')} ({t('optional')})</option>
-                  <option value="M">Masculino</option>
-                  <option value="F">Feminino</option>
-                  <option value="Prefiro não dizer">Outro</option>
-                </select>
               </div>
-
-              {/* Live Age/Category Preview */}
-              {birthDate && (
-                <div className="flex gap-2 animate-fade-in">
-                  <div className="flex-1 p-2 rounded-lg bg-secondary/50 border border-secondary text-center">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">Idade</p>
-                    <p className="text-sm font-bold">{calculateAge(birthDate)} anos</p>
-                  </div>
-                  <div className="flex-1 p-2 rounded-lg bg-primary/10 border border-primary/20 text-center">
-                    <p className="text-[10px] text-primary/70 uppercase font-bold">Categoria</p>
-                    <p className="text-sm font-bold text-primary">{calculateCategory(birthDate)}</p>
-                  </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">{t('gender')}</label>
+                <div className="flex gap-2">
+                  {['M', 'F', 'Outro'].map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setGender(g)}
+                      className={cn(
+                        "flex-1 py-2 px-3 rounded-lg border text-sm transition-all",
+                        gender === g
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover:bg-accent"
+                      )}
+                    >
+                      {g === 'M' ? t('genderM') : g === 'F' ? t('genderF') : t('genderOther')}
+                    </button>
+                  ))}
                 </div>
-              )}
-
-              <Input
-                type="email"
-                placeholder="E-mail"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <Input
-                placeholder={`${t('team')} ${t('optional')}`}
-                value={team}
-                onChange={(e) => setTeam(e.target.value)}
-              />
-              <Input
-                placeholder={`${t('position')} ${t('optional')}`}
-                value={position}
-                onChange={(e) => setPosition(e.target.value)}
-              />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">{t('team')}</label>
+                <Input
+                  placeholder={t('profileClubPlaceholder')}
+                  value={team}
+                  onChange={(e) => setTeam(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">{t('position')}</label>
+                <Input
+                  placeholder={t('position')}
+                  value={position}
+                  onChange={(e) => setPosition(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
               <Button
-                className="w-full"
+                className="flex-1"
                 onClick={handleSubmit}
-                disabled={!name.trim() || submitting}
+                disabled={submitting || !name}
               >
-                {submitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    {editingId ? t('save') : t('add')}
-                  </>
-                )}
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
+                {editingId ? t('save') : t('add')}
               </Button>
+              {editingId && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingId(null);
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                >
+                  {t('cancel')}
+                </Button>
+              )}
             </div>
           </div>
         )}
 
-        {/* Search Bar */}
-        {athletes.length > 0 && !showForm && (
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder={t('search')}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 bg-background/50"
-              />
+        {/* Live Age/Category Preview */}
+        {birthDate && showForm && (
+          <div className="flex gap-2 animate-fade-in">
+            <div className="flex-1 p-2 rounded-lg bg-secondary/50 border border-secondary text-center">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold">{t('age')}</p>
+              <p className="text-sm font-bold">{calculateAge(birthDate)} {t('years')}</p>
+            </div>
+            <div className="flex-1 p-2 rounded-lg bg-primary/10 border border-primary/20 text-center">
+              <p className="text-[10px] text-primary/70 uppercase font-bold">{t('category')}</p>
+              <p className="text-sm font-bold text-primary">{calculateCategory(birthDate)}</p>
             </div>
           </div>
         )}
@@ -373,7 +373,7 @@ export default function Athletes() {
                       <p className="font-medium truncate">{athlete.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-sm text-muted-foreground truncate">
-                          {athlete.position || 'Sem posição'}
+                          {athlete.position || t('noPosition')}
                           {athlete.team && ` • ${athlete.team}`}
                         </p>
                         {athlete.birth_date && (
@@ -439,7 +439,7 @@ export default function Athletes() {
                               className="flex items-center justify-between p-2 rounded bg-background/50"
                             >
                               <span className="text-sm text-muted-foreground">
-                                {test.test ? formatDate(test.test.date) : 'Data não disponível'}
+                                {test.test ? formatDate(test.test.date) : t('dateNotAvailable')}
                               </span>
                               <span className="font-mono font-bold text-primary">
                                 {Number(test.pv_corrigido).toFixed(1)} km/h
@@ -497,7 +497,7 @@ export default function Athletes() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive">
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {t('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
