@@ -326,29 +326,24 @@ class SupabaseServiceClass {
     avgPV: number;
     lastPV: number;
     testCount: number;
-  }[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
-
+  async getGroupRanking(): Promise<any[]> {
     try {
-      // Step 1: Get all test IDs belonging to this user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
       const { data: userTests, error: testsError } = await supabase
         .from('tests')
         .select('id, date')
         .eq('user_id', user.id)
         .order('date', { ascending: false });
 
-      if (testsError || !userTests || userTests.length === 0) {
-        console.error('Error fetching user tests:', testsError);
-        return [];
-      }
+      if (testsError || !userTests?.length) return [];
 
       const testIds = userTests.map(t => t.id);
 
-      // Step 2: Get all test_results for those tests
       const { data: results, error: resultsError } = await supabase
         .from('test_results')
-        .select('athlete_id, athlete_name, pv_corrigido, test_id')
+        .select('athlete_id, athlete_name, pv_corrigido, test_id, athletes(birth_date, position)')
         .in('test_id', testIds);
 
       if (resultsError || !results) {
@@ -359,41 +354,45 @@ class SupabaseServiceClass {
       // Build a map of test_id → date for ordering
       const testDateMap = new Map(userTests.map(t => [t.id, t.date]));
 
-      // Sort results by test date descending (newest first)
-      const sortedResults = [...results].sort((a, b) => {
-        const dateA = testDateMap.get(a.test_id) || '';
-        const dateB = testDateMap.get(b.test_id) || '';
-        return dateB.localeCompare(dateA);
-      });
-
-      // Agrupa por atleta
-      const athleteMap = new Map<string, {
-        name: string;
-        pvValues: number[];
-        lastPV: number;
-      }>();
-
-      for (const r of sortedResults) {
+      // Agrupa por atleta e mantém o registro mais recente
+      const athleteStats = results.reduce((acc, r) => {
         const pvValue = parseFloat(String(r.pv_corrigido)) || 0;
-        const existing = athleteMap.get(r.athlete_id);
-        if (existing) {
-          existing.pvValues.push(pvValue);
-        } else {
-          athleteMap.set(r.athlete_id, {
-            name: r.athlete_name,
-            pvValues: [pvValue],
-            lastPV: pvValue,
-          });
-        }
-      }
+        const athleteData = Array.isArray(r.athletes) ? r.athletes[0] : r.athletes;
 
-      // Calcula ranking
-      const ranking = Array.from(athleteMap.entries()).map(([athleteId, data]) => ({
-        athleteId,
-        athleteName: data.name,
-        avgPV: data.pvValues.reduce((a, b) => a + b, 0) / data.pvValues.length,
-        lastPV: data.lastPV,
-        testCount: data.pvValues.length,
+        if (!acc[r.athlete_id]) {
+          acc[r.athlete_id] = {
+            athleteId: r.athlete_id,
+            athleteName: r.athlete_name,
+            birth_date: athleteData?.birth_date,
+            position: athleteData?.position,
+            totalPV: 0,
+            testCount: 0,
+            lastPV: 0,
+            lastDate: '',
+          };
+        }
+
+        acc[r.athlete_id].totalPV += pvValue;
+        acc[r.athlete_id].testCount += 1;
+
+        // Atualiza o último PV baseado na data do teste
+        const testDate = testDateMap.get(r.test_id) || '';
+        if (testDate >= acc[r.athlete_id].lastDate) {
+          acc[r.athlete_id].lastDate = testDate;
+          acc[r.athlete_id].lastPV = pvValue;
+        }
+
+        return acc;
+      }, {} as Record<string, any>);
+
+      const ranking = Object.values(athleteStats).map((s: any) => ({
+        athleteId: s.athleteId,
+        athleteName: s.athleteName,
+        birth_date: s.birth_date,
+        position: s.position,
+        avgPV: s.totalPV / s.testCount,
+        lastPV: s.lastPV,
+        testCount: s.testCount,
       }));
 
       return ranking.sort((a, b) => b.avgPV - a.avgPV);

@@ -165,7 +165,8 @@ export default function AthleteProfile() {
   const classification = lastTest
     ? ClassificationService.getClassification(
       lastTest.test.protocol_level as 1 | 2,
-      Number(lastTest.pv_corrigido)
+      Number(lastTest.pv_corrigido),
+      athlete
     )
     : null;
 
@@ -347,7 +348,7 @@ export default function AthleteProfile() {
             <Activity className="w-6 h-6 mx-auto mb-2" style={{ color: classification.color }} />
             <h3 className="text-sm text-muted-foreground mb-1">{t('currentClassification')}</h3>
             <p className="text-3xl font-bold" style={{ color: classification.color }}>
-              {classification.label}
+              {t(classification.label as any)}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
               {t('percentile')} {classification.percentile} • {t('level')} {lastTest.test.protocol_level}
@@ -495,7 +496,8 @@ export default function AthleteProfile() {
               {tests.map((test, index) => {
                 const testClassification = ClassificationService.getClassification(
                   test.test.protocol_level as 1 | 2,
-                  Number(test.pv_corrigido)
+                  Number(test.pv_corrigido),
+                  athlete
                 );
                 const fc = test.fc_final ?? test.fc_estimada;
 
@@ -537,10 +539,7 @@ export default function AthleteProfile() {
                         <p className="text-[10px] text-muted-foreground uppercase font-bold">{t('distanceLabel')}</p>
                         <p className="text-sm font-mono font-bold">{test.final_distance} <span className="text-[10px] font-normal text-muted-foreground">m</span></p>
                       </div>
-                      <div className="p-1 px-2 rounded-lg bg-background/50 border border-border/50">
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">{t('hrLabel')}</p>
-                        <p className="text-sm font-mono font-bold">{test.fc_final || '-'} <span className="text-[10px] font-normal text-muted-foreground">bpm</span></p>
-                      </div>
+
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-mono font-bold text-primary">

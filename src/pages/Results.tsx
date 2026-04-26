@@ -318,7 +318,8 @@ export default function Results() {
           {sortedResults.map((ar, index) => {
             const classification = ClassificationService.getClassification(
               multiResult.protocol.level,
-              ar.pvCorrigido
+              ar.pvCorrigido,
+              selectedAthletes.find(a => a.id === ar.athleteId)
             );
             const isExpanded = expandedAthlete === ar.athleteId;
 

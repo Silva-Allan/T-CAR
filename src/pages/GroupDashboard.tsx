@@ -308,7 +308,8 @@ export default function GroupDashboard() {
                                         const actualIndex = index + 3;
                                         const classification = ClassificationService.getClassification(
                                             1,
-                                            item.avgPV
+                                            item.avgPV,
+                                            { birth_date: (item as any).birth_date, position: (item as any).position }
                                         );
 
                                         return (
@@ -329,7 +330,7 @@ export default function GroupDashboard() {
                                                                 backgroundColor: `${classification.color}20`,
                                                                 color: classification.color
                                                             }}>
-                                                            {classification.label}
+                                                            {t(classification.label as any)}
                                                         </span>
                                                         <span className="text-xs text-muted-foreground">
                                                             {item.testCount} {item.testCount !== 1 ? t('summaryTests') : t('test').toLowerCase()}

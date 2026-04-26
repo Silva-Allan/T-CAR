@@ -1,7 +1,7 @@
 // ======================================================================
 // T-CAR 2.0 — Audio Service (Atualizado)
 // ======================================================================
-// Áudio principal do protocolo T-CAR via MP3 (beep.mp3).
+// Áudio principal do protocolo T-CAR via MP3 (Audio T-car 10 BPM_BR.mp3).
 // O MP3 contém todos os bips e falas no tempo correto.
 // Controle: play/pause/resume/stop sincronizado com o teste.
 // Web Audio API como fallback para tons sintetizados (falha, fim).
@@ -88,7 +88,7 @@ class AudioServiceClass {
     if (this.protocolLoaded) return;
 
     try {
-      this.protocolAudio = new Audio('/audio/beep.mp3');
+      this.protocolAudio = new Audio('/audio/Audio T-car 10 BPM_BR.mp3');
       this.protocolAudio.volume = this.volume;
       this.protocolAudio.preload = 'auto';
 

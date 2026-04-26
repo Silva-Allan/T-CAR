@@ -8,7 +8,7 @@ import { SupabaseService } from '@/services/SupabaseService';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
-import { calculateAge, calculateCategory } from '@/models/types';
+import { calculateAge, calculateCategory, VALID_POSITIONS } from '@/models/types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -283,20 +283,32 @@ export default function Athletes() {
                   onChange={(e) => setTeam(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">{t('position')}</label>
-                <Input
-                  placeholder={t('position')}
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value)}
-                />
+              <div className="space-y-2 sm:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground">{t('position')} <span className="text-destructive">*</span></label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {VALID_POSITIONS.map((pos) => (
+                    <button
+                      key={pos}
+                      type="button"
+                      onClick={() => setPosition(pos)}
+                      className={cn(
+                        "py-2 px-3 rounded-lg border text-[10px] sm:text-xs transition-all",
+                        position === pos
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover:bg-accent"
+                      )}
+                    >
+                      {t(pos as any)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="flex gap-2 pt-2">
               <Button
                 className="flex-1"
                 onClick={handleSubmit}
-                disabled={submitting || !name}
+                disabled={submitting || !name || !birthDate || !position}
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
                 {editingId ? t('save') : t('add')}

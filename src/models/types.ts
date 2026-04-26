@@ -165,6 +165,16 @@ export interface PendingSyncItem {
 
 // --- Utilitários ---
 
+export const VALID_POSITIONS = [
+  'defender_central', // Zagueiro
+  'defender_wide',    // Lateral
+  'midfielder',       // Meio-campista
+  'forward',          // Atacante
+  'center_forward'    // Centroavante
+] as const;
+
+export type Position = typeof VALID_POSITIONS[number];
+
 export function calculateAge(birthDate: string): number {
   const today = new Date();
   const birth = new Date(birthDate);
@@ -178,12 +188,10 @@ export function calculateAge(birthDate: string): number {
 
 export function calculateCategory(birthDate: string): string {
   const age = calculateAge(birthDate);
-  if (age < 7) return 'Kids';
   if (age <= 11) return 'Sub-11';
   if (age <= 13) return 'Sub-13';
   if (age <= 15) return 'Sub-15';
   if (age <= 17) return 'Sub-17';
   if (age <= 20) return 'Sub-20';
-  if (age <= 34) return 'Adulto';
-  return 'Master';
+  return 'Profissional';
 }

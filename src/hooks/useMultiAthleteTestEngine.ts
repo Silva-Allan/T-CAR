@@ -38,7 +38,7 @@ const INITIAL_STATE: MultiAthleteTestState = {
 // primeiro beep de corrida. O timer do teste começa a contar a partir
 // deste ponto no áudio.
 // Primeiro beep ocorre logo após o segundo 7.4 → offset = 7.4s
-const AUDIO_INTRO_OFFSET = 7.4; // seconds — "Teste T-CAR... Repetição 1... Atenção... (beep)"
+const AUDIO_INTRO_OFFSET = 6; // seconds — "Teste T-CAR... Repetição 1... Atenção... (beep)"
 
 export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athlete[]) {
   const [state, setState] = useState<MultiAthleteTestState>(() => ({

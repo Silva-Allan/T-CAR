@@ -27,7 +27,8 @@ export default function SelectAthletes() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showNewForm, setShowNewForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [newName, setNewName] = useState('');
+  const [newBirthDate, setNewBirthDate] = useState('');
+  const [newPosition, setNewPosition] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -48,9 +49,19 @@ export default function SelectAthletes() {
     else setLoadingMore(true);
 
     try {
-      const data = await SupabaseService.getAthletes(pageToLoad, PAGE_SIZE);
+      // Busca atletas e últimos resultados em paralelo
+      const [athletesRaw, latestResults] = await Promise.all([
+        SupabaseService.getAthletes(pageToLoad, PAGE_SIZE),
+        isInitial ? SupabaseService.getLatestResultPerAthlete() : Promise.resolve([])
+      ]);
 
-      const athletesData: ExtendedAthlete[] = data.map(a => ({
+      // Cria um mapa para busca rápida do último PV (athlete_id -> pv_corrigido)
+      const resultsMap = new Map();
+      latestResults.forEach(r => {
+        resultsMap.set(r.athlete_id, r.pv_corrigido);
+      });
+
+      const athletesData: ExtendedAthlete[] = athletesRaw.map(a => ({
         id: a.id,
         userId: a.user_id,
         name: a.name,
@@ -58,16 +69,25 @@ export default function SelectAthletes() {
         position: a.position,
         birthDate: a.birth_date || undefined,
         createdAt: a.created_at,
-        pvTcar: (a as any).pv_tcar
+        // Se já tivermos o pv_tcar no objeto (futuro) ou se encontrarmos no mapa de resultados
+        pvTcar: (a as any).pv_tcar || resultsMap.get(a.id)
       }));
 
       if (isInitial) {
         setAthletes(athletesData);
       } else {
-        setAthletes(prev => [...prev, ...athletesData]);
+        setAthletes(prev => {
+          // Se for carregamento incremental, precisamos garantir que os novos atletas também 
+          // recebam seus PVs caso eles estivessem no resultsMap inicial
+          if (!isInitial && latestResults.length === 0) {
+            // Em loads subsequentes, podemos precisar buscar mais resultados ou usar cache
+            // Por enquanto, o resultsMap já cobre os atletas da primeira página.
+          }
+          return [...prev, ...athletesData];
+        });
       }
 
-      setHasMore(data.length === PAGE_SIZE);
+      setHasMore(athletesRaw.length === PAGE_SIZE);
       setPage(pageToLoad);
     } catch (error) {
       console.error('Error loading athletes:', error);
@@ -100,13 +120,16 @@ export default function SelectAthletes() {
     try {
       const newAthlete = await SupabaseService.createAthlete({
         name: newName.trim(),
+        birth_date: newBirthDate || null,
+        position: newPosition || null,
         team: null,
-        position: null,
         sport: 'athletics'
       });
       await loadAthletes(0, true);
       setSelectedIds(prev => new Set([...prev, newAthlete.id]));
       setNewName('');
+      setNewBirthDate('');
+      setNewPosition('');
       setShowNewForm(false);
     } catch (error) {
       console.error('Error creating athlete:', error);
@@ -165,17 +188,48 @@ export default function SelectAthletes() {
 
         {/* Quick add form */}
         {showNewForm ? (
-          <div className="glass-card p-4 rounded-xl animate-scale-in">
-            <h3 className="font-semibold mb-3">{t('newAthlete')}</h3>
-            <div className="flex gap-2">
-              <Input
-                placeholder={t('athleteNamePlaceholder')}
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleQuickAdd()}
-                autoFocus
-              />
-              <Button onClick={handleQuickAdd} disabled={!newName.trim() || !canAddMore || submitting}>
+          <div className="glass-card p-4 rounded-xl animate-scale-in space-y-4">
+            <h3 className="font-semibold">{t('newAthlete')}</h3>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase">{t('name')}</label>
+                <Input
+                  placeholder={t('athleteNamePlaceholder')}
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">{t('birthDateLabel')}</label>
+                  <Input
+                    type="date"
+                    value={newBirthDate}
+                    onChange={(e) => setNewBirthDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">{t('position')}</label>
+                  <select
+                    value={newPosition}
+                    onChange={(e) => setNewPosition(e.target.value)}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">{t('select') || 'Selecionar'}</option>
+                    <option value="defender_central">{t('defender_central')}</option>
+                    <option value="defender_wide">{t('defender_wide')}</option>
+                    <option value="midfielder">{t('midfielder')}</option>
+                    <option value="forward">{t('forward')}</option>
+                    <option value="center_forward">{t('center_forward')}</option>
+                  </select>
+                </div>
+              </div>
+              <Button 
+                onClick={handleQuickAdd} 
+                className="w-full"
+                disabled={!newName.trim() || !newBirthDate || !newPosition || !canAddMore || submitting}
+              >
                 {submitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
