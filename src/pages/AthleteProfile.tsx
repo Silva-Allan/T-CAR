@@ -321,7 +321,12 @@ export default function AthleteProfile() {
             </div>
             <div>
               <h2 className="text-xl font-bold leading-none">{athlete.name}</h2>
-              <p className="text-sm text-muted-foreground mt-1">{athlete.team || t('noPosition')}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {[
+                  athlete.position ? t(athlete.position as any) : null,
+                  athlete.team
+                ].filter(Boolean).join(' • ') || t('noPosition')}
+              </p>
             </div>
           </div>
           {athlete.birth_date && (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, User, ChevronRight, Users, Loader2, Search, ChevronDown } from 'lucide-react';
+import { User, Users, Loader2, Search, ChevronDown, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/store/AppContext';
 import { Athlete } from '@/models/types';
 import { cn } from '@/lib/utils';
+import { AthleteFilterBar, applyAthleteFilters, EMPTY_FILTERS, type AthleteFilters } from '@/components/AthleteFilterBar';
 
 const MAX_ATHLETES = 10;
 const MIN_ATHLETES = 1;
@@ -25,13 +26,11 @@ export default function SelectAthletes() {
   const { t } = useTranslation();
   const [athletes, setAthletes] = useState<ExtendedAthlete[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [showNewForm, setShowNewForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [newBirthDate, setNewBirthDate] = useState('');
-  const [newPosition, setNewPosition] = useState('');
+  const [filters, setFilters] = useState<AthleteFilters>(EMPTY_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const PAGE_SIZE = 20;
@@ -49,13 +48,11 @@ export default function SelectAthletes() {
     else setLoadingMore(true);
 
     try {
-      // Busca atletas e últimos resultados em paralelo
       const [athletesRaw, latestResults] = await Promise.all([
         SupabaseService.getAthletes(pageToLoad, PAGE_SIZE),
         isInitial ? SupabaseService.getLatestResultPerAthlete() : Promise.resolve([])
       ]);
 
-      // Cria um mapa para busca rápida do último PV (athlete_id -> pv_corrigido)
       const resultsMap = new Map();
       latestResults.forEach(r => {
         resultsMap.set(r.athlete_id, r.pv_corrigido);
@@ -67,24 +64,17 @@ export default function SelectAthletes() {
         name: a.name,
         team: a.team,
         position: a.position,
+        gender: (a as any).gender || null,
+        birth_date: a.birth_date || undefined,
         birthDate: a.birth_date || undefined,
         createdAt: a.created_at,
-        // Se já tivermos o pv_tcar no objeto (futuro) ou se encontrarmos no mapa de resultados
         pvTcar: (a as any).pv_tcar || resultsMap.get(a.id)
       }));
 
       if (isInitial) {
         setAthletes(athletesData);
       } else {
-        setAthletes(prev => {
-          // Se for carregamento incremental, precisamos garantir que os novos atletas também 
-          // recebam seus PVs caso eles estivessem no resultsMap inicial
-          if (!isInitial && latestResults.length === 0) {
-            // Em loads subsequentes, podemos precisar buscar mais resultados ou usar cache
-            // Por enquanto, o resultsMap já cobre os atletas da primeira página.
-          }
-          return [...prev, ...athletesData];
-        });
+        setAthletes(prev => [...prev, ...athletesData]);
       }
 
       setHasMore(athletesRaw.length === PAGE_SIZE);
@@ -113,31 +103,6 @@ export default function SelectAthletes() {
     setSelectedIds(newSet);
   };
 
-  const handleQuickAdd = async () => {
-    if (!newName.trim() || submitting) return;
-    setSubmitting(true);
-
-    try {
-      const newAthlete = await SupabaseService.createAthlete({
-        name: newName.trim(),
-        birth_date: newBirthDate || null,
-        position: newPosition || null,
-        team: null,
-        sport: 'athletics'
-      });
-      await loadAthletes(0, true);
-      setSelectedIds(prev => new Set([...prev, newAthlete.id]));
-      setNewName('');
-      setNewBirthDate('');
-      setNewPosition('');
-      setShowNewForm(false);
-    } catch (error) {
-      console.error('Error creating athlete:', error);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const handleContinue = () => {
     const selected = athletes.filter(a => selectedIds.has(a.id));
     setSelectedAthletes(selected);
@@ -146,6 +111,17 @@ export default function SelectAthletes() {
 
   const canContinue = selectedIds.size >= MIN_ATHLETES;
   const canAddMore = selectedIds.size < MAX_ATHLETES;
+
+  const hasActiveFilters = filters.position || filters.category || filters.gender;
+
+  // Aplicar busca textual + filtros
+  const filteredAthletes = applyAthleteFilters(
+    athletes.filter(a =>
+      a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (a.team && a.team.toLowerCase().includes(searchTerm.toLowerCase()))
+    ),
+    filters
+  );
 
   if (loading) {
     return (
@@ -159,7 +135,7 @@ export default function SelectAthletes() {
 
   return (
     <PageContainer title={t('selectAthletesTitle')} showBack backTo="/">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="max-w-2xl mx-auto space-y-4">
         {/* Info banner */}
         <div className="glass-card p-4 rounded-xl flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -172,92 +148,30 @@ export default function SelectAthletes() {
             </div>
           </div>
           <Button
-            onClick={() => setShowNewForm(!showNewForm)}
-            variant="ghost"
+            onClick={() => setShowFilters(!showFilters)}
+            variant={hasActiveFilters ? "default" : "ghost"}
             size="sm"
-            className="text-primary hover:text-primary hover:bg-primary/10"
+            className={cn(
+              hasActiveFilters
+                ? "bg-primary/10 text-primary border border-primary/30"
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            {showNewForm ? t('cancel') : (
-              <>
-                <Plus className="w-4 h-4 mr-1" />
-                {t('quickAdd')}
-              </>
+            <SlidersHorizontal className="w-4 h-4 mr-1" />
+            {t('filters') || 'Filtros'}
+            {hasActiveFilters && (
+              <span className="ml-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
+                {[filters.position, filters.category, filters.gender].filter(Boolean).length}
+              </span>
             )}
           </Button>
         </div>
 
-        {/* Quick add form */}
-        {showNewForm ? (
-          <div className="glass-card p-4 rounded-xl animate-scale-in space-y-4">
-            <h3 className="font-semibold">{t('newAthlete')}</h3>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">{t('name')}</label>
-                <Input
-                  placeholder={t('athleteNamePlaceholder')}
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  autoFocus
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">{t('birthDateLabel')}</label>
-                  <Input
-                    type="date"
-                    value={newBirthDate}
-                    onChange={(e) => setNewBirthDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">{t('position')}</label>
-                  <select
-                    value={newPosition}
-                    onChange={(e) => setNewPosition(e.target.value)}
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="">{t('select') || 'Selecionar'}</option>
-                    <option value="defender_central">{t('defender_central')}</option>
-                    <option value="defender_wide">{t('defender_wide')}</option>
-                    <option value="midfielder">{t('midfielder')}</option>
-                    <option value="forward">{t('forward')}</option>
-                    <option value="center_forward">{t('center_forward')}</option>
-                  </select>
-                </div>
-              </div>
-              <Button 
-                onClick={handleQuickAdd} 
-                className="w-full"
-                disabled={!newName.trim() || !newBirthDate || !newPosition || !canAddMore || submitting}
-              >
-                {submitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  t('add')
-                )}
-              </Button>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mt-2 w-full"
-              onClick={() => setShowNewForm(false)}
-            >
-              {t('cancel')}
-            </Button>
+        {/* Filter bar (colapsável) */}
+        {showFilters && (
+          <div className="glass-card p-4 rounded-xl animate-scale-in">
+            <AthleteFilterBar filters={filters} onChange={setFilters} t={t} />
           </div>
-        ) : (
-          <Button
-            variant="outline"
-            className="w-full h-14 justify-start gap-3"
-            onClick={() => setShowNewForm(true)}
-            disabled={!canAddMore}
-          >
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <Plus className="w-5 h-5 text-primary" />
-            </div>
-            <span>{t('addNewAthlete')}</span>
-          </Button>
         )}
 
         {/* Search Bar */}
@@ -274,16 +188,15 @@ export default function SelectAthletes() {
         )}
 
         {/* Athletes list */}
-        {athletes.length > 0 ? (
+        {filteredAthletes.length > 0 ? (
           <div className="space-y-3 pb-24">
-            <h3 className="text-sm font-bold text-muted-foreground px-1">{t('registeredAthletes')}</h3>
-            {athletes
-              .filter(a =>
-                a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (a.position && a.position.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (a.team && a.team.toLowerCase().includes(searchTerm.toLowerCase()))
-              )
-              .map((athlete, index) => {
+            <h3 className="text-sm font-bold text-muted-foreground px-1">
+              {t('registeredAthletes')}
+              {(searchTerm || hasActiveFilters) && (
+                <span className="ml-1 text-primary">({filteredAthletes.length})</span>
+              )}
+            </h3>
+            {filteredAthletes.map((athlete, index) => {
                 const isSelected = selectedIds.has(athlete.id);
                 return (
                   <button
@@ -321,8 +234,13 @@ export default function SelectAthletes() {
                             {t('noTests')}
                           </span>
                         )}
+                        {athlete.position && (
+                          <span className="text-[10px] text-muted-foreground">
+                            • {t(athlete.position as any)}
+                          </span>
+                        )}
                         {athlete.team && (
-                          <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
                             • {athlete.team}
                           </span>
                         )}
@@ -337,8 +255,8 @@ export default function SelectAthletes() {
                 );
               })}
 
-            {/* Load More Button */}
-            {hasMore && athletes.length > 0 && !searchTerm && (
+            {/* Load More */}
+            {hasMore && !searchTerm && !hasActiveFilters && (
               <div className="py-4 flex justify-center">
                 <Button
                   variant="ghost"
@@ -357,23 +275,31 @@ export default function SelectAthletes() {
               </div>
             )}
           </div>
+        ) : athletes.length > 0 ? (
+          <div className="text-center py-8">
+            <Search className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+            <p className="text-muted-foreground text-sm">{t('noFilterResults') || 'Nenhum atleta encontrado com os filtros selecionados'}</p>
+          </div>
         ) : (
           <div className="text-center py-8">
             <User className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-            <p className="text-muted-foreground">Nenhum atleta cadastrado</p>
-            <p className="text-sm text-muted-foreground">Adicione atletas para continuar</p>
+            <p className="text-muted-foreground">{t('noAthletesRegistered') || 'Nenhum atleta cadastrado'}</p>
+            <p className="text-sm text-muted-foreground">{t('addAthletesFirst') || 'Cadastre atletas na listagem de atletas'}</p>
           </div>
         )}
 
-        {/* Continue button */}
-        <div className="pt-4 border-t border-border">
-          <Button
-            className="w-full h-14"
-            onClick={handleContinue}
-            disabled={!canContinue}
-          >
-            Continuar com {selectedIds.size} atleta{selectedIds.size !== 1 ? 's' : ''}
-          </Button>
+        {/* Continue button (sticky) */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-lg border-t border-border">
+          <div className="max-w-2xl mx-auto">
+            <Button
+              variant="hero"
+              className="w-full h-14 text-base"
+              onClick={handleContinue}
+              disabled={!canContinue}
+            >
+              {t('continueWith') || 'Continuar com'} {selectedIds.size} {t('athlete') || 'atleta'}{selectedIds.size !== 1 ? 's' : ''}
+            </Button>
+          </div>
         </div>
       </div>
     </PageContainer>

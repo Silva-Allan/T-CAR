@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Plus, User, Trash2, Edit2, X, Check, ChevronDown, ChevronUp, ExternalLink, Loader2, Search } from 'lucide-react';
+import { Plus, User, Trash2, Edit2, X, Check, ChevronDown, ChevronUp, ExternalLink, Loader2, Search, SlidersHorizontal } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 import { calculateAge, calculateCategory, VALID_POSITIONS } from '@/models/types';
+import { AthleteFilterBar, applyAthleteFilters, EMPTY_FILTERS, type AthleteFilters } from '@/components/AthleteFilterBar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,6 +63,8 @@ export default function Athletes() {
   const [hasMore, setHasMore] = useState(true);
   const PAGE_SIZE = 20;
   const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState<AthleteFilters>(EMPTY_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -211,7 +214,7 @@ export default function Athletes() {
       backTo="/"
     >
       <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -221,11 +224,35 @@ export default function Athletes() {
               className="pl-9"
             />
           </div>
+          <Button
+            onClick={() => setShowFilters(!showFilters)}
+            variant="ghost"
+            size="sm"
+            className={cn(
+              filters.position || filters.category || filters.gender
+                ? "bg-primary/10 text-primary border border-primary/30"
+                : "text-muted-foreground"
+            )}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            {(filters.position || filters.category || filters.gender) && (
+              <span className="ml-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
+                {[filters.position, filters.category, filters.gender].filter(Boolean).length}
+              </span>
+            )}
+          </Button>
           <Button onClick={() => setShowForm(!showForm)} size="sm">
             {showForm ? <X className="w-4 h-4 mr-1" /> : <Plus className="w-4 h-4 mr-1" />}
             {showForm ? t('cancel') : t('newAthlete')}
           </Button>
         </div>
+
+        {/* Filter bar */}
+        {showFilters && (
+          <div className="glass-card p-4 rounded-xl animate-scale-in">
+            <AthleteFilterBar filters={filters} onChange={setFilters} t={t} />
+          </div>
+        )}
 
         {showForm && (
           <div className="glass-card p-5 rounded-xl space-y-4 animate-in slide-in-from-top duration-300">
@@ -370,6 +397,15 @@ export default function Athletes() {
                   (a.position && a.position.toLowerCase().includes(searchTerm.toLowerCase()));
                 return matchesSearch;
               })
+              .filter(a => {
+                if (filters.position && a.position !== filters.position) return false;
+                if (filters.category) {
+                  if (!a.birth_date) return false;
+                  if (calculateCategory(a.birth_date) !== filters.category) return false;
+                }
+                if (filters.gender && a.gender !== filters.gender) return false;
+                return true;
+              })
               .map((athlete, index) => (
                 <div
                   key={athlete.id}
@@ -385,7 +421,7 @@ export default function Athletes() {
                       <p className="font-medium truncate">{athlete.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-sm text-muted-foreground truncate">
-                          {athlete.position || t('noPosition')}
+                          {athlete.position ? t(athlete.position as any) : t('noPosition')}
                           {athlete.team && ` • ${athlete.team}`}
                         </p>
                         {athlete.birth_date && (

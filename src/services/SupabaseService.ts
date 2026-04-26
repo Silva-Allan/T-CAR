@@ -6,6 +6,7 @@
 // ======================================================================
 
 import { supabase } from '@/integrations/supabase/client';
+import { Logger } from '@/utils/Logger';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 type AthleteRow = Tables<'athletes'>;
@@ -33,7 +34,7 @@ class SupabaseServiceClass {
       .single();
 
     if (error) {
-      console.error('Erro ao buscar perfil:', error);
+      Logger.error('Erro ao buscar perfil:', error?.message);
       return null;
     }
     return data;
@@ -54,7 +55,7 @@ class SupabaseServiceClass {
       .single();
 
     if (error) {
-      console.error('Erro ao atualizar perfil:', error);
+      Logger.error('Erro ao atualizar perfil:', error?.message);
       throw error;
     }
     return data;
@@ -79,21 +80,25 @@ class SupabaseServiceClass {
       .range(from, to);
 
     if (error) {
-      console.error('Erro ao buscar atletas:', error);
+      Logger.error('Erro ao buscar atletas:', error?.message);
       return [];
     }
     return data || [];
   }
 
   async getAthlete(id: string): Promise<AthleteRow | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
     const { data, error } = await supabase
       .from('athletes')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (error) {
-      console.error('Erro ao buscar atleta:', error);
+      Logger.warn('Erro ao buscar atleta:', error.message);
       return null;
     }
     return data;
@@ -110,35 +115,43 @@ class SupabaseServiceClass {
       .single();
 
     if (error) {
-      console.error('Erro ao criar atleta:', error);
+      Logger.error('Erro ao criar atleta:', error?.message);
       throw error;
     }
     return data!;
   }
 
   async updateAthlete(id: string, updates: Partial<AthleteRow>): Promise<AthleteRow> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Não autenticado');
+
     const { data, error } = await supabase
       .from('athletes')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single();
 
     if (error) {
-      console.error('Erro ao atualizar atleta:', error);
+      Logger.error('Erro ao atualizar atleta:', error.message);
       throw error;
     }
     return data!;
   }
 
   async deleteAthlete(id: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Não autenticado');
+
     const { error } = await supabase
       .from('athletes')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
 
     if (error) {
-      console.error('Erro ao deletar atleta:', error);
+      Logger.error('Erro ao deletar atleta:', error.message);
       throw error;
     }
   }
@@ -163,7 +176,7 @@ class SupabaseServiceClass {
           error.message?.includes('NetworkError') ||
           error.status === 0;
         if (isNetworkError) {
-          console.warn('[SupabaseService] Erro de rede ao autenticar — salvando offline:', error.message);
+          Logger.warn('[SupabaseService] Erro de rede ao autenticar — salvando offline');
           throw new Error('NETWORK_ERROR');
         }
       }
@@ -172,7 +185,7 @@ class SupabaseServiceClass {
       // fetch() itself threw — definitely a network error
       if (err.message === 'NETWORK_ERROR') throw err;
       if (err.message?.includes('fetch') || err.name === 'TypeError') {
-        console.warn('[SupabaseService] Falha de rede (fetch exception) — salvando offline:', err.message);
+        Logger.warn('[SupabaseService] Falha de rede (fetch exception) — salvando offline');
         throw new Error('NETWORK_ERROR');
       }
       throw err;
@@ -190,7 +203,7 @@ class SupabaseServiceClass {
       .single();
 
     if (testError || !test) {
-      console.error('Erro ao criar teste:', testError);
+      Logger.error('Erro ao criar teste:', testError?.message);
       throw testError;
     }
 
@@ -218,7 +231,7 @@ class SupabaseServiceClass {
       .select();
 
     if (resultsError) {
-      console.error('Erro ao criar resultados:', resultsError);
+      Logger.error('Erro ao criar resultados:', resultsError?.message);
       // Rollback: deletar teste se resultados falharam
       await supabase.from('tests').delete().eq('id', test.id);
       throw resultsError;
@@ -242,7 +255,7 @@ class SupabaseServiceClass {
       .range(from, to);
 
     if (error) {
-      console.error('Erro ao buscar testes:', error);
+      Logger.error('Erro ao buscar testes:', error?.message);
       return [];
     }
     return data || [];
@@ -252,10 +265,14 @@ class SupabaseServiceClass {
     test: TestRow;
     results: TestResultRow[];
   } | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
     const { data: test, error: testError } = await supabase
       .from('tests')
       .select('*')
       .eq('id', testId)
+      .eq('user_id', user.id)
       .single();
 
     if (testError || !test) return null;
@@ -271,13 +288,17 @@ class SupabaseServiceClass {
   }
 
   async deleteTest(testId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Não autenticado');
+
     const { error } = await supabase
       .from('tests')
       .delete()
-      .eq('id', testId);
+      .eq('id', testId)
+      .eq('user_id', user.id);
 
     if (error) {
-      console.error('Erro ao deletar teste:', error);
+      Logger.error('Erro ao deletar teste:', error.message);
       throw error;
     }
   }
@@ -290,25 +311,29 @@ class SupabaseServiceClass {
    * Busca histórico de resultados de um atleta específico.
    */
   async getAthleteTestHistory(athleteId: string, page = 0, pageSize = 10): Promise<(TestResultRow & { test: TestRow })[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
     const from = page * pageSize;
     const to = from + pageSize - 1;
 
+    // INNER JOIN com tests garante que só retorna resultados de testes desse user
     const { data, error } = await supabase
       .from('test_results')
       .select('*, test:tests!inner(*)')
       .eq('athlete_id', athleteId)
+      .eq('test.user_id', user.id)
       .order('created_at', { ascending: false })
       .range(from, to);
 
     if (error) {
-      console.error('Erro ao buscar histórico do atleta:', error);
+      Logger.warn('Erro ao buscar histórico do atleta:', error.message);
       return [];
     }
 
-    console.log('[SupabaseService] getAthleteTestHistory raw data:', JSON.stringify(data?.[0], null, 2));
+    Logger.log('[SupabaseService] getAthleteTestHistory loaded', data?.length, 'records');
 
     return (data || []).map((row: any) => {
-      // Handle test relation being array or object
       const testRelation = Array.isArray(row.test) ? row.test[0] : row.test;
       return {
         ...row,
@@ -320,12 +345,6 @@ class SupabaseServiceClass {
   /**
    * Ranking do grupo: média de PV corrigido por atleta.
    */
-  async getGroupRanking(): Promise<{
-    athleteId: string;
-    athleteName: string;
-    avgPV: number;
-    lastPV: number;
-    testCount: number;
   async getGroupRanking(): Promise<any[]> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -347,7 +366,7 @@ class SupabaseServiceClass {
         .in('test_id', testIds);
 
       if (resultsError || !results) {
-        console.error('Error fetching test results:', resultsError);
+        Logger.error('Error fetching test results:', resultsError?.message);
         return [];
       }
 
@@ -397,7 +416,7 @@ class SupabaseServiceClass {
 
       return ranking.sort((a, b) => b.avgPV - a.avgPV);
     } catch (error) {
-      console.error('Error computing group ranking:', error);
+      Logger.error('Error computing group ranking:', error);
       return [];
     }
   }

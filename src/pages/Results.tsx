@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AthleteResult } from '@/models/types';
 import { cn } from '@/lib/utils';
+import { Logger } from '@/utils/Logger';
 
 export default function Results() {
   const location = useLocation();
@@ -109,7 +110,7 @@ export default function Results() {
       // ── TIMESTAMP: usa a hora real do fim do teste, não a hora do clique em Salvar
       // Isso garante data/hora correta mesmo em modo offline ou salvamento tardio.
       const testDate = multiResult.completedAt || new Date().toISOString();
-      console.log(`[Results] Salvando teste. Data/hora do teste: ${testDate} | Online: ${navigator.onLine}`);
+      Logger.log(`[Results] Salvando teste. Data/hora: ${testDate} | Online: ${navigator.onLine}`);
 
       const testData = {
         protocol_level: multiResult.protocol.level,
@@ -156,7 +157,7 @@ export default function Results() {
       });
     } catch (error: any) {
       const errMsg = error?.message || '';
-      console.warn('[Results] Falha ao salvar online:', errMsg);
+      Logger.warn('[Results] Falha ao salvar online:', errMsg);
 
       // Real auth error — user not logged in, redirect
       if (errMsg === 'AUTH_ERROR') {
@@ -172,7 +173,7 @@ export default function Results() {
 
       // Network error or any other failure — save offline
       try {
-        console.log('[Results] Salvando offline após falha de rede...');
+        Logger.log('[Results] Salvando offline após falha de rede...');
         const testId = crypto.randomUUID();
         await SyncService.saveForLaterSync(
           testId,

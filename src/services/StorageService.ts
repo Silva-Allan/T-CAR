@@ -1,18 +1,16 @@
 // ======================================================================
-// T-CAR 2.0 — Storage Service (localStorage - legado + backup)
+// T-CAR 2.0 — Storage Service (Somente Configurações)
 // ======================================================================
-// Mantém compatibilidade com localStorage existente.
-// IndexedDB é o armazenamento principal para execução offline.
+// SEGURANÇA: Dados sensíveis (atletas, resultados) NÃO são armazenados
+// em localStorage. Apenas configurações não-sensíveis do app.
+// IndexedDB é usado para dados offline com escopo isolado.
 // ======================================================================
 
-import { Athlete, TestResult, AppSettings, BeepType } from '@/models/types';
+import { AppSettings, BeepType } from '@/models/types';
 
 const KEYS = {
-  ATHLETES: 'tcar_athletes',
-  RESULTS: 'tcar_results',
   SETTINGS: 'tcar_settings',
-  MULTI_RESULTS: 'tcar_multi_results',
-};
+} as const;
 
 const DEFAULT_SETTINGS: AppSettings = {
   volume: 0.8,
@@ -22,60 +20,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 
 class StorageServiceClass {
   // ====================================================================
-  // Atletas (backup local)
-  // ====================================================================
-
-  getAthletes(): Athlete[] {
-    try {
-      const data = localStorage.getItem(KEYS.ATHLETES);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  saveAthlete(athlete: Athlete): void {
-    const athletes = this.getAthletes();
-    const index = athletes.findIndex(a => a.id === athlete.id);
-    if (index >= 0) {
-      athletes[index] = athlete;
-    } else {
-      athletes.push(athlete);
-    }
-    localStorage.setItem(KEYS.ATHLETES, JSON.stringify(athletes));
-  }
-
-  deleteAthlete(id: string): void {
-    const athletes = this.getAthletes().filter(a => a.id !== id);
-    localStorage.setItem(KEYS.ATHLETES, JSON.stringify(athletes));
-  }
-
-  // ====================================================================
-  // Resultados (backup local)
-  // ====================================================================
-
-  getResults(): TestResult[] {
-    try {
-      const data = localStorage.getItem(KEYS.RESULTS);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  saveResult(result: TestResult): void {
-    const results = this.getResults();
-    results.push(result);
-    localStorage.setItem(KEYS.RESULTS, JSON.stringify(results));
-  }
-
-  deleteResult(id: string): void {
-    const results = this.getResults().filter(r => r.id !== id);
-    localStorage.setItem(KEYS.RESULTS, JSON.stringify(results));
-  }
-
-  // ====================================================================
-  // Configurações
+  // Configurações (não-sensíveis)
   // ====================================================================
 
   getSettings(): AppSettings {
@@ -92,25 +37,8 @@ class StorageServiceClass {
   }
 
   // ====================================================================
-  // Utilitários
+  // Limpeza segura
   // ====================================================================
-
-  exportResultsToCSV(): string {
-    const results = this.getResults();
-    if (results.length === 0) return '';
-
-    const headers = ['Atleta', 'PV-TCAR', 'Estágios', 'Distância', 'Tempo', 'Data'];
-    const rows = results.map(r => [
-      r.athleteName,
-      r.peakVelocity.toFixed(1),
-      r.completedStages,
-      r.finalDistance,
-      r.totalTime.toFixed(0),
-      new Date(r.date).toLocaleDateString('pt-BR'),
-    ]);
-
-    return [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  }
 
   resetAllData(): void {
     Object.values(KEYS).forEach(key => localStorage.removeItem(key));

@@ -7,6 +7,7 @@
 
 import { IndexedDBService } from './IndexedDBService';
 import { SupabaseService } from './SupabaseService';
+import { Logger } from '@/utils/Logger';
 
 type SyncStatusListener = (status: SyncStatus) => void;
 
@@ -20,12 +21,7 @@ export interface SyncStatus {
 
 // ── Logging helper ──────────────────────────────────────────────────────
 const LOG = (msg: string, data?: any) => {
-    const ts = new Date().toLocaleTimeString('pt-BR', { hour12: false });
-    if (data !== undefined) {
-        console.log(`[SyncService ${ts}] ${msg}`, data);
-    } else {
-        console.log(`[SyncService ${ts}] ${msg}`);
-    }
+    Logger.service('SyncService', msg, data);
 };
 
 class SyncServiceClass {
