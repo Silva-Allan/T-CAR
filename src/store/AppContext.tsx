@@ -57,6 +57,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     AudioService.setVolume(settings.volume);
   }, [settings.volume]);
 
+  useEffect(() => {
+    AudioService.setLanguage(settings.language || 'pt');
+  }, [settings.language]);
+
   const initializeAudio = async (): Promise<boolean> => {
     const success = await AudioService.initialize();
     setIsAudioReady(success);

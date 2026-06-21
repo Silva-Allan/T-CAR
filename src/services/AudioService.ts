@@ -7,6 +7,12 @@
 // Web Audio API como fallback para tons sintetizados (falha, fim).
 // ======================================================================
 
+const PROTOCOL_AUDIO_FILES: Record<string, string> = {
+  pt: '/audio/Audio T-car 10 BPM_BR.mp3',
+  en: '/audio/Audio T-Car 10 BPM_ Eng.mp3',
+  es: '/audio/Audio T-car 10 BPM_Esp.mp3',
+};
+
 class AudioServiceClass {
   private audioContext: AudioContext | null = null;
   private volume = 0.8;
@@ -16,6 +22,7 @@ class AudioServiceClass {
   private protocolAudio: HTMLAudioElement | null = null;
   private protocolLoaded = false;
   private isProtocolPlaying = false;
+  private currentLanguage = 'pt';
 
   private permissionGranted = false;
 
@@ -82,13 +89,26 @@ class AudioServiceClass {
   // ====================================================================
 
   /**
+   * Define o idioma do áudio do protocolo e recarrega se necessário.
+   */
+  async setLanguage(lang: string): Promise<void> {
+    if (this.currentLanguage === lang && this.protocolLoaded) return;
+    if (this.isProtocolPlaying) return;
+    this.currentLanguage = lang;
+    this.protocolLoaded = false;
+    this.protocolAudio = null;
+    await this.loadProtocolAudio();
+  }
+
+  /**
    * Pré-carrega o áudio do protocolo T-CAR.
    */
   private async loadProtocolAudio(): Promise<void> {
     if (this.protocolLoaded) return;
 
+    const audioFile = PROTOCOL_AUDIO_FILES[this.currentLanguage] ?? PROTOCOL_AUDIO_FILES['pt'];
     try {
-      this.protocolAudio = new Audio('/audio/Audio T-car 10 BPM_BR.mp3');
+      this.protocolAudio = new Audio(audioFile);
       this.protocolAudio.volume = this.volume;
       this.protocolAudio.preload = 'auto';
 

@@ -19,8 +19,12 @@ export const Logger = {
     if (IS_DEV) console.warn(message, ...args);
   },
   error: (message: string, ...args: any[]) => {
-    // Erros sempre são logados (necessário para diagnóstico)
-    console.error(message, ...args);
+    // Em produção só loga a mensagem, sem objetos que podem conter dados sensíveis.
+    if (IS_DEV) {
+      console.error(message, ...args);
+    } else {
+      console.error(message);
+    }
   },
   /** Log com timestamp formatado (para serviços como SyncService) */
   service: (serviceName: string, message: string, data?: any) => {

@@ -69,6 +69,10 @@ export default function Results() {
   }
 
   const handleHeartRateChange = (athleteId: string, value: string) => {
+    if (value !== '') {
+      const num = parseInt(value);
+      if (isNaN(num) || num < 30 || num > 300) return;
+    }
     setHeartRates(prev => ({ ...prev, [athleteId]: value }));
   };
 
@@ -105,6 +109,12 @@ export default function Results() {
       return;
     }
 
+    const tempValue = temperature ? parseFloat(temperature) : null;
+    if (tempValue !== null && (isNaN(tempValue) || tempValue < -10 || tempValue > 60)) {
+      toast({ variant: 'destructive', title: t('ambientTemperature'), description: '-10 ~ 60 °C' });
+      return;
+    }
+
     setSaving(true);
     try {
       // ── TIMESTAMP: usa a hora real do fim do teste, não a hora do clique em Salvar
@@ -115,7 +125,7 @@ export default function Results() {
       const testData = {
         protocol_level: multiResult.protocol.level,
         total_time: Math.round(multiResult.totalTime),
-        temperature: temperature ? parseFloat(temperature) : null,
+        temperature: tempValue,
         date: testDate,
       };
 
@@ -142,10 +152,6 @@ export default function Results() {
         // Offline: salvar para sincronização posterior
         const testId = crypto.randomUUID();
         await SyncService.saveForLaterSync(testId, testData, resultsData);
-        toast({
-          title: t('savedOffline'),
-          description: t('offlineSyncDesc')
-        });
       }
 
       setSaved(true);
@@ -153,7 +159,7 @@ export default function Results() {
         title: t('testSaved'),
         description: navigator.onLine
           ? t('testSavedDesc')
-          : t('syncLaterDesc')
+          : t('offlineSyncDesc')
       });
     } catch (error: any) {
       const errMsg = error?.message || '';

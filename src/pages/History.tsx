@@ -120,6 +120,7 @@ export default function History() {
     link.href = URL.createObjectURL(blob);
     link.download = `tcar_resultados_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
+    URL.revokeObjectURL(link.href);
   };
 
   const formatDate = (dateString: string) => {

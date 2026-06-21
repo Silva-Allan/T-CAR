@@ -1,24 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
 
-// Usa ping externo para verificar conectividade real
-const PING_URL = 'https://www.google.com/favicon.ico';
-const PING_INTERVAL_MS = 8000; // verifica a cada 8 segundos
-const PING_TIMEOUT_MS = 4000; // timeout de 4 segundos
+// Usa o próprio Supabase como alvo do ping — se ele não responde, o app não funciona mesmo.
+const PING_URL = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`;
+const PING_INTERVAL_MS = 8000;
+const PING_TIMEOUT_MS = 4000;
 
 async function checkRealConnectivity(): Promise<boolean> {
     try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
 
-        await fetch(PING_URL, {
+        const response = await fetch(PING_URL, {
             method: 'HEAD',
-            mode: 'no-cors',   // evita erro de CORS — fetch retorna resposta opaque
             cache: 'no-store',
             signal: controller.signal,
         });
 
         clearTimeout(timeout);
-        return true;
+        // Supabase retorna 200 ou 401 — ambos indicam que o servidor está acessível.
+        return response.status < 500;
     } catch {
         return false;
     }

@@ -67,7 +67,9 @@ class CalculatorServiceClass {
 
     if (birthDate) {
       const age = calculateAge(birthDate);
-      return { fcFinal: null, fcEstimada: 220 - age };
+      if (age > 0 && age <= 100) {
+        return { fcFinal: null, fcEstimada: 220 - age };
+      }
     }
 
     return { fcFinal: null, fcEstimada: null };

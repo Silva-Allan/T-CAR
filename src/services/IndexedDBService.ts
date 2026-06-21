@@ -122,11 +122,19 @@ class IndexedDBServiceClass {
         return new Promise((resolve, reject) => {
             const tx = db.transaction(STORES.PENDING_SYNC, 'readwrite');
             const store = tx.objectStore(STORES.PENDING_SYNC);
-            store.put({
+            // Use add() instead of put() to avoid silently overwriting an existing
+            // entry and resetting its retryCount/createdAt.
+            const addRequest = store.add({
                 ...item,
                 createdAt: new Date().toISOString(),
                 retryCount: 0,
             });
+            addRequest.onerror = (e) => {
+                // ConstraintError = key already exists; keep the existing entry.
+                if ((addRequest.error)?.name === 'ConstraintError') {
+                    e.preventDefault();
+                }
+            };
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
         });
@@ -163,7 +171,11 @@ class IndexedDBServiceClass {
             request.onsuccess = () => {
                 if (request.result) {
                     request.result.retryCount = (request.result.retryCount || 0) + 1;
-                    store.put(request.result);
+                    const putRequest = store.put(request.result);
+                    putRequest.onerror = () => {
+                        // Non-critical: retry counter update failed; item stays at old count.
+                        console.warn('[IndexedDB] Failed to increment retryCount for', id);
+                    };
                 }
             };
             tx.oncomplete = () => resolve();

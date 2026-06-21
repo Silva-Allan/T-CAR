@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useApp } from '@/store/AppContext';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useMultiAthleteTestEngine } from '@/hooks/useMultiAthleteTestEngine';
+import { useMultiAthleteTestEngine, AUDIO_INTRO_OFFSET } from '@/hooks/useMultiAthleteTestEngine';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { CalculatorService } from '@/services/CalculatorService';
 import { ScreenLockService } from '@/services/ScreenLockService';
@@ -142,7 +142,7 @@ export default function TestExecution() {
       : state.currentPhase === 'recovery'
         ? ((state.repElapsedTime - 12) / 6) * 100
         : state.currentPhase === 'idle' && state.isStarted && state.elapsedTime < 0
-          ? ((7.4 + state.elapsedTime) / 7.4) * 100
+          ? ((AUDIO_INTRO_OFFSET + state.elapsedTime) / AUDIO_INTRO_OFFSET) * 100
           : 0;
 
   // DIAGNOSTIC: Sync Flash logic

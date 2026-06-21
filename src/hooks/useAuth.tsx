@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 import { IndexedDBService } from '@/services/IndexedDBService';
 
 interface AuthContextType {
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -59,15 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       toast({
         variant: 'destructive',
-        title: 'Erro ao criar conta',
+        title: t('authSignupError'),
         description: error.message
       });
       return { error };
     }
 
     toast({
-      title: 'Conta criada!',
-      description: 'Você pode fazer login agora.'
+      title: t('authSignupSuccess'),
+      description: t('authSignupSuccessDesc')
     });
 
     return { error: null };
@@ -75,14 +77,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
+      email: email.trim(),
+      password: password.trim(),
     });
 
     if (error) {
       toast({
         variant: 'destructive',
-        title: 'Erro ao entrar',
+        title: t('authSigninError'),
         description: error.message
       });
       return { error };
@@ -99,15 +101,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       toast({
         variant: 'destructive',
-        title: 'Erro ao solicitar redefinição',
+        title: t('authResetError'),
         description: error.message
       });
       return { error };
     }
 
     toast({
-      title: 'E-mail enviado',
-      description: 'Verifique sua caixa de entrada para redefinir a senha.'
+      title: t('authResetEmailSent'),
+      description: t('authResetEmailSentDesc')
     });
 
     return { error: null };
@@ -121,8 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.clear();
 
       toast({
-        title: 'Logout realizado',
-        description: 'Sessao e dados locais limpos com segurança.'
+        title: t('authLogoutSuccess'),
+        description: t('authLogoutSuccessDesc')
       });
     } catch (e) {
       console.error('Erro ao deslogar:', e);

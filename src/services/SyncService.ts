@@ -24,6 +24,18 @@ const LOG = (msg: string, data?: any) => {
     Logger.service('SyncService', msg, data);
 };
 
+const MAX_RETRIES = 5;
+const SYNC_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error('SYNC_TIMEOUT')), ms)
+        ),
+    ]);
+}
+
 class SyncServiceClass {
     private listeners: SyncStatusListener[] = [];
     private isSyncing = false;
@@ -124,7 +136,10 @@ class SyncServiceClass {
                     });
 
                     if (item.type === 'test') {
-                        await SupabaseService.createTest(item.testData, item.resultsData);
+                        await withTimeout(
+                            SupabaseService.createTest(item.testData, item.resultsData),
+                            SYNC_TIMEOUT_MS
+                        );
                         await IndexedDBService.removePendingSync(item.id);
                         successCount++;
                         LOG(`✅ Item ${item.id} sincronizado com sucesso.`);
@@ -137,8 +152,9 @@ class SyncServiceClass {
                     await IndexedDBService.incrementRetryCount(item.id);
                     this.lastError = errMsg;
 
-                    if (item.retryCount >= 4) {
-                        LOG(`⚠️ Item ${item.id} atingiu o limite de tentativas. Não será retentado automaticamente.`);
+                    if (item.retryCount >= MAX_RETRIES - 1) {
+                        LOG(`⚠️ Item ${item.id} atingiu o limite de ${MAX_RETRIES} tentativas. Removendo da fila.`);
+                        await IndexedDBService.removePendingSync(item.id);
                     }
                 }
             }
@@ -177,7 +193,7 @@ class SyncServiceClass {
         });
         const total = await IndexedDBService.getPendingSyncCount();
         LOG(`📦 Fila offline agora tem ${total} item(ns) pendente(s).`);
-        this.notifyListeners();
+        await this.notifyListeners();
     }
 
     /**

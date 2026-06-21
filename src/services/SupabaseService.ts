@@ -488,10 +488,17 @@ class SupabaseServiceClass {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Não autenticado');
 
-    // O cascade no schema deve cuidar disso, mas vamos garantir as tabelas principais
-    await supabase.from('test_results').delete().filter('test_id', 'in',
-      supabase.from('tests').select('id').eq('user_id', user.id)
-    );
+    // Buscar IDs dos testes antes de deletar resultados (subquery inline não é válida no JS client)
+    const { data: userTests } = await supabase
+      .from('tests')
+      .select('id')
+      .eq('user_id', user.id);
+
+    const testIds = userTests?.map(t => t.id) ?? [];
+    if (testIds.length > 0) {
+      await supabase.from('test_results').delete().in('test_id', testIds);
+    }
+
     await supabase.from('athletes').delete().eq('user_id', user.id);
     await supabase.from('tests').delete().eq('user_id', user.id);
     await supabase.from('profiles').delete().eq('id', user.id);

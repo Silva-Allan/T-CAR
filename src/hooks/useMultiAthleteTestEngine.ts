@@ -37,8 +37,7 @@ const INITIAL_STATE: MultiAthleteTestState = {
 // AUDIO OFFSET: tempo (em segundos) de introdução do MP3 antes do
 // primeiro beep de corrida. O timer do teste começa a contar a partir
 // deste ponto no áudio.
-// Primeiro beep ocorre logo após o segundo 7.4 → offset = 7.4s
-const AUDIO_INTRO_OFFSET = 6; // seconds — "Teste T-CAR... Repetição 1... Atenção... (beep)"
+export const AUDIO_INTRO_OFFSET = 6; // seconds — ajustado ao áudio real do protocolo
 
 export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athlete[]) {
   const [state, setState] = useState<MultiAthleteTestState>(() => ({
@@ -61,6 +60,8 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
   const accumulatedPauseRef = useRef<number>(0);
   const audioStartedRef = useRef<boolean>(false);
   const beepSyncedRef = useRef<boolean>(false);
+  // Cooldown por atleta para evitar duplo-clique acidental no botão de falha
+  const failureCooldownRef = useRef<Record<string, number>>({});
 
   // Update protocol values when protocol changes
   useEffect(() => {
@@ -89,6 +90,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
   }, []);
 
   const startTest = useCallback(async () => {
+    if (intervalRef.current !== null) return; // evita startTest duplo
     await AudioService.resume();
 
     setState(prev => ({
@@ -221,6 +223,11 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
   }, []);
 
   const recordFailure = useCallback((athleteId: string) => {
+    const now = Date.now();
+    const lastClick = failureCooldownRef.current[athleteId] ?? 0;
+    if (now - lastClick < 800) return; // ignora cliques com menos de 800ms de intervalo
+    failureCooldownRef.current[athleteId] = now;
+
     AudioService.playFailBeep();
 
     setState(prev => {
