@@ -32,6 +32,16 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { AthleteResult } from '@/models/types';
 import { cn } from '@/lib/utils';
 import { Logger } from '@/utils/Logger';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function Results() {
   const location = useLocation();
@@ -48,6 +58,7 @@ export default function Results() {
   const [saved, setSaved] = useState(false);
   const [trainerProfile, setTrainerProfile] = useState<any>(null);
   const [expandedAthlete, setExpandedAthlete] = useState<string | null>(null);
+  const [pendingNav, setPendingNav] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -69,10 +80,7 @@ export default function Results() {
   }
 
   const handleHeartRateChange = (athleteId: string, value: string) => {
-    if (value !== '') {
-      const num = parseInt(value);
-      if (isNaN(num) || num < 30 || num > 300) return;
-    }
+    if (value !== '' && !/^\d*$/.test(value)) return;
     setHeartRates(prev => ({ ...prev, [athleteId]: value }));
   };
 
@@ -98,7 +106,7 @@ export default function Results() {
     });
   }, [multiResult.athleteResults, heartRates, selectedAthletes]);
 
-  const handleSaveToHistory = async () => {
+  const handleSaveToHistory = async (): Promise<boolean> => {
     if (!user) {
       toast({
         variant: 'destructive',
@@ -106,13 +114,22 @@ export default function Results() {
         description: t('loginToSaveDesc')
       });
       navigate('/auth');
-      return;
+      return false;
     }
 
     const tempValue = temperature ? parseFloat(temperature) : null;
     if (tempValue !== null && (isNaN(tempValue) || tempValue < -10 || tempValue > 60)) {
       toast({ variant: 'destructive', title: t('ambientTemperature'), description: '-10 ~ 60 °C' });
-      return;
+      return false;
+    }
+
+    for (const value of Object.values(heartRates)) {
+      if (value === '') continue;
+      const num = parseInt(value);
+      if (isNaN(num) || num < 30 || num > 300) {
+        toast({ variant: 'destructive', title: t('finalHR'), description: '30 ~ 300 bpm' });
+        return false;
+      }
     }
 
     setSaving(true);
@@ -161,6 +178,7 @@ export default function Results() {
           ? t('testSavedDesc')
           : t('offlineSyncDesc')
       });
+      return true;
     } catch (error: any) {
       const errMsg = error?.message || '';
       Logger.warn('[Results] Falha ao salvar online:', errMsg);
@@ -174,7 +192,7 @@ export default function Results() {
         });
         navigate('/auth');
         setSaving(false);
-        return;
+        return false;
       }
 
       // Network error or any other failure — save offline
@@ -210,15 +228,34 @@ export default function Results() {
           title: `📦 ${t('savedOffline')}`,
           description: t('offlineSavedWaitSync'),
         });
+        return true;
       } catch {
         toast({
           variant: 'destructive',
           title: t('criticalSaveError'),
           description: t('criticalSaveErrorDesc'),
         });
+        return false;
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleNavigateAttempt = (path: string) => {
+    if (saved) {
+      navigate(path);
+      return;
+    }
+    setPendingNav(path);
+  };
+
+  const handleSaveAndLeave = async () => {
+    const target = pendingNav;
+    setPendingNav(null);
+    const success = await handleSaveToHistory();
+    if (success && target) {
+      navigate(target);
     }
   };
 
@@ -488,7 +525,7 @@ export default function Results() {
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => navigate('/select-athletes')}
+            onClick={() => handleNavigateAttempt('/select-athletes')}
           >
             <RotateCcw className="w-4 h-4 mr-2" />
             {t('newTest')}
@@ -496,13 +533,36 @@ export default function Results() {
           <Button
             variant="default"
             className="flex-1"
-            onClick={() => navigate('/')}
+            onClick={() => handleNavigateAttempt('/')}
           >
             <Home className="w-4 h-4 mr-2" />
             {t('home')}
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={pendingNav !== null} onOpenChange={(open) => { if (!open) setPendingNav(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('unsavedTestTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('unsavedTestDesc')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingNav(null)}>
+              {t('cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { const target = pendingNav; setPendingNav(null); if (target) navigate(target); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t('leaveWithoutSaving')}
+            </AlertDialogAction>
+            <AlertDialogAction onClick={handleSaveAndLeave}>
+              {t('saveAndLeave')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   );
 }

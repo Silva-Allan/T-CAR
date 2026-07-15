@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Play, Pause, Square, AlertTriangle, ChevronLeft, RotateCcw, Shield, ShieldOff,
+  Play, Square, AlertTriangle, ChevronLeft, RotateCcw, Shield, ShieldOff,
   Wifi, WifiOff, Volume2, XCircle
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -446,7 +446,7 @@ export default function TestExecution() {
           </>
         ) : (
           <>
-            {state.isPaused ? (
+            {state.isPaused && (
               <button
                 onClick={resumeTest}
                 className="flex-1 field-button-primary flex items-center justify-center gap-2"
@@ -454,15 +454,6 @@ export default function TestExecution() {
                 <Play className="w-5 h-5 fill-current" />
                 {t('resume')}
               </button>
-            ) : (
-              <Button
-                onClick={pauseTest}
-                variant="secondary"
-                className="flex-1 min-h-[3.5rem] text-base font-semibold"
-              >
-                <Pause className="w-5 h-5 mr-2" />
-                {t('pause')}
-              </Button>
             )}
             <Button
               onClick={handleEnd}
