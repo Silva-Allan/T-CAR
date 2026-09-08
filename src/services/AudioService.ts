@@ -149,6 +149,7 @@ class AudioServiceClass {
     this.protocolAudio.play()
       .then(() => {
         this.isProtocolPlaying = true;
+        this.updateMediaSession('playing');
         console.log('[AudioService] Áudio do protocolo iniciado');
       })
       .catch(err => {
@@ -163,6 +164,7 @@ class AudioServiceClass {
   pauseProtocolAudio(): void {
     if (!this.protocolAudio || !this.isProtocolPlaying) return;
     this.protocolAudio.pause();
+    this.updateMediaSession('paused');
     console.log('[AudioService] Áudio do protocolo pausado em:', this.protocolAudio.currentTime.toFixed(1) + 's');
   }
 
@@ -172,9 +174,11 @@ class AudioServiceClass {
    */
   resumeProtocolAudio(): void {
     if (!this.protocolAudio || !this.isProtocolPlaying) return;
-    this.protocolAudio.play().catch(err => {
-      console.warn('[AudioService] Erro ao retomar áudio:', err);
-    });
+    this.protocolAudio.play()
+      .then(() => this.updateMediaSession('playing'))
+      .catch(err => {
+        console.warn('[AudioService] Erro ao retomar áudio:', err);
+      });
   }
 
   /**
@@ -186,7 +190,36 @@ class AudioServiceClass {
     this.protocolAudio.pause();
     this.protocolAudio.currentTime = 0;
     this.isProtocolPlaying = false;
+    this.updateMediaSession('none');
     console.log('[AudioService] Áudio do protocolo parado');
+  }
+
+  /**
+   * Sincroniza a Media Session com o estado real de playback do protocolo.
+   * Áudio ativamente tocando com uma Media Session registrada é uma das
+   * poucas coisas que o navegador confiavelmente isenta de suspensão em
+   * segundo plano — é o que mantém o protocolo tocando com a tela apagada
+   * ou o app minimizado, e mostra um controle de mídia na tela de bloqueio.
+   *
+   * De propósito, NÃO registra handlers de 'play'/'pause': o teste só pode
+   * ser pausado por uma ação deliberada dentro do app — nunca por um toque
+   * acidental no controle de mídia da tela de bloqueio ou de um fone Bluetooth.
+   */
+  private updateMediaSession(state: 'playing' | 'paused' | 'none'): void {
+    if (!('mediaSession' in navigator)) return;
+    try {
+      if (state !== 'none' && !navigator.mediaSession.metadata) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: 'T-CAR — Teste em andamento',
+          artist: 'T-CAR',
+        });
+      } else if (state === 'none') {
+        navigator.mediaSession.metadata = null;
+      }
+      navigator.mediaSession.playbackState = state;
+    } catch (error) {
+      console.warn('[AudioService] Erro ao atualizar Media Session:', error);
+    }
   }
 
   /**

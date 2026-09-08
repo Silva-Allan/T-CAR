@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Play, Square, AlertTriangle, ChevronLeft, RotateCcw, Shield, ShieldOff,
+  Play, Square, ChevronLeft, RotateCcw, Shield, ShieldOff,
   Wifi, WifiOff, Volume2, XCircle
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -16,16 +16,7 @@ import { ScreenLockService } from '@/services/ScreenLockService';
 import { PVTableService } from '@/services/PVTableService';
 import { AudioService } from '@/services/AudioService';
 import { cn } from '@/lib/utils';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { toast } from '@/components/ui/sonner';
 
 export default function TestExecution() {
   const { t } = useTranslation();
@@ -33,13 +24,11 @@ export default function TestExecution() {
   const { selectedAthletes, selectedProtocol, isAudioReady, initializeAudio } = useApp();
   const isOnline = useOnlineStatus();
   const [showAudioModal, setShowAudioModal] = useState(false);
-  const [interruptionDetected, setInterruptionDetected] = useState(false);
   const visibilityCleanupRef = useRef<(() => void) | null>(null);
 
   const {
     state,
     startTest,
-    pauseTest,
     resumeTest,
     recordFailure,
     resetFailures,
@@ -54,15 +43,18 @@ export default function TestExecution() {
     }
   }, [selectedAthletes, navigate]);
 
-  // Screen lock + visibility change detection
+  // Screen lock — o teste NUNCA pausa sozinho ao perder visibilidade
+  // (tela bloqueada, troca de app). O cronômetro é sincronizado pelo
+  // áudio do protocolo (ver useMultiAthleteTestEngine), então continua
+  // correto mesmo com a aba em segundo plano — só avisamos, sem bloquear.
   useEffect(() => {
     if (state.isRunning) {
       ScreenLockService.activateForTest();
 
       visibilityCleanupRef.current = ScreenLockService.onVisibilityChange((isVisible) => {
-        if (!isVisible && state.isRunning && !state.isPaused) {
-          pauseTest();
-          setInterruptionDetected(true);
+        if (isVisible) {
+          ScreenLockService.reacquireIfNeeded();
+          toast.success(t('syncRestored'));
         }
       });
     }
@@ -73,7 +65,7 @@ export default function TestExecution() {
         visibilityCleanupRef.current = null;
       }
     };
-  }, [state.isRunning]);
+  }, [state.isRunning, t]);
 
   useEffect(() => {
     return () => {
@@ -116,11 +108,6 @@ export default function TestExecution() {
         },
       });
     }
-  };
-
-  const handleResumeFromInterruption = () => {
-    setInterruptionDetected(false);
-    resumeTest();
   };
 
   const activeAthletes = state.athleteStates.filter(a => !a.isEliminated);
@@ -217,37 +204,6 @@ export default function TestExecution() {
             </Button>
           </div>
         </div>
-      )}
-
-      {/* Interruption Modal */}
-      {interruptionDetected && (
-        <AlertDialog open={interruptionDetected} onOpenChange={setInterruptionDetected}>
-          <AlertDialogContent className="glass-card border-destructive/20 max-w-[90vw] rounded-2xl">
-            <AlertDialogHeader>
-              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
-                <AlertTriangle className="w-6 h-6 text-destructive" />
-              </div>
-              <AlertDialogTitle className="text-xl">{t('interruptionDetected')}</AlertDialogTitle>
-              <AlertDialogDescription className="text-base">
-                {t('interruptionDesc')}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogAction
-                className="bg-destructive hover:bg-destructive/90 text-white h-12 rounded-xl"
-                onClick={handleResumeFromInterruption}
-              >
-                {t('resumeTest')}
-              </AlertDialogAction>
-              <AlertDialogCancel
-                className="h-12 rounded-xl"
-                onClick={handleEnd}
-              >
-                {t('endTest')}
-              </AlertDialogCancel>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       )}
 
       <div className="space-y-4 max-w-lg mx-auto">

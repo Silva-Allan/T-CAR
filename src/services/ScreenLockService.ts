@@ -24,6 +24,12 @@ class ScreenLockServiceClass {
     private orientationLocked = false;
     private visibilityCallbacks: VisibilityCallback[] = [];
     private boundVisibilityHandler: (() => void) | null = null;
+    // Verdadeiro enquanto um teste está em execução — usado para readquirir
+    // Wake Lock/orientação automaticamente quando a aba volta a ficar visível
+    // (o navegador libera o Wake Lock sozinho ao ocultar o documento, e nunca
+    // o readquire por conta própria).
+    private testActive = false;
+    private boundReacquireHandler: (() => void) | null = null;
 
     /**
      * Solicita Wake Lock para manter a tela ligada durante o teste.
@@ -94,9 +100,29 @@ class ScreenLockServiceClass {
     }
 
     /**
+     * Readquire Wake Lock e bloqueio de orientação se um teste ainda estiver
+     * ativo. Chamado automaticamente ao voltar a ficar visível, e também pode
+     * ser chamado por consumidores (ex: TestExecution) como reforço — é
+     * idempotente e seguro de chamar múltiplas vezes.
+     */
+    async reacquireIfNeeded(): Promise<void> {
+        if (!this.testActive) return;
+        await this.requestWakeLock();
+        if (this.orientationLocked) {
+            await this.lockOrientation('portrait');
+        }
+    }
+
+    /**
      * Libera todos os bloqueios.
      */
     async release(): Promise<void> {
+        this.testActive = false;
+        if (this.boundReacquireHandler) {
+            document.removeEventListener('visibilitychange', this.boundReacquireHandler);
+            this.boundReacquireHandler = null;
+        }
+
         // Liberar Wake Lock
         if (this.wakeLock) {
             try {
@@ -136,6 +162,17 @@ class ScreenLockServiceClass {
         wakeLock: boolean;
         orientationLock: boolean;
     }> {
+        this.testActive = true;
+
+        if (!this.boundReacquireHandler) {
+            this.boundReacquireHandler = () => {
+                if (!document.hidden) {
+                    this.reacquireIfNeeded();
+                }
+            };
+            document.addEventListener('visibilitychange', this.boundReacquireHandler);
+        }
+
         const [wakeLock, orientationLock] = await Promise.all([
             this.requestWakeLock(),
             this.lockOrientation('portrait'),
