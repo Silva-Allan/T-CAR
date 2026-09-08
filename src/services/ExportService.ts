@@ -734,7 +734,7 @@ class ExportServiceClass {
             `${t('estimatedHR')} (bpm)`, `${t('distance')} (m)`, t('status'),
         ];
         const rows = athleteResults.map(ar => [
-            `"${ar.athleteName}"`, ar.completedStages, ar.completedRepsInLastStage,
+            this.csvField(ar.athleteName), ar.completedStages, ar.completedRepsInLastStage,
             ar.totalReps, ar.pvBruto.toFixed(1), ar.pvCorrigido.toFixed(1),
             ar.fcFinal ?? '', ar.fcEstimada ?? '', ar.finalDistance,
             ar.eliminatedByFailure ? t('yes') : t('no'),
@@ -761,7 +761,7 @@ class ExportServiceClass {
         lang: string
     ): string {
         const headers = [t('position'), t('athlete'), `${t('avgPVLabel')} (km/h)`, t('testCount')];
-        const rows = ranking.map(r => [`#${r.position}`, `"${r.athleteName}"`, r.avgPV.toFixed(1), r.testCount]);
+        const rows = ranking.map(r => [`#${r.position}`, this.csvField(r.athleteName), r.avgPV.toFixed(1), r.testCount]);
         const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
         return [
             [`T-CAR - ${t('reportGroup')}`].join(','),
@@ -807,6 +807,21 @@ class ExportServiceClass {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    /**
+     * Escapa um valor de texto livre para uso seguro em campo CSV.
+     * - Duplica aspas duplas internas (regra padrão do formato CSV).
+     * - Prefixa com apóstrofo valores que começam com =, +, -, @, tab ou CR,
+     *   para neutralizar injeção de fórmula (CSV/Formula Injection) quando
+     *   o arquivo é aberto em Excel/Sheets.
+     */
+    private csvField(value: string): string {
+        let safe = value.replace(/"/g, '""');
+        if (/^[=+\-@\t\r]/.test(safe)) {
+            safe = `'${safe}`;
+        }
+        return `"${safe}"`;
     }
 }
 
