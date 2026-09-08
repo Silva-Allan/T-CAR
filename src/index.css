@@ -19,6 +19,10 @@
     --primary: 150 100% 20%;
     --primary-foreground: 0 0% 100%;
 
+    /* Mesmo verde, versão clara — para texto sobre fundos escuros (card do teste em execução).
+       --primary é escuro demais (~2.3:1) sobre o card invertido; este tom sobe para ~9:1. */
+    --primary-bright: 150 75% 55%;
+
     --secondary: 210 10% 92%;
     --secondary-foreground: 210 11% 15%;
 

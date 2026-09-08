@@ -179,7 +179,7 @@ export default function TestExecution() {
       </div>
       <span className={cn(
         "block text-[9px] font-black uppercase tracking-widest text-center transition-opacity",
-        isActive ? "text-white opacity-100" : "text-white/30"
+        isActive ? "text-white opacity-100" : "text-white/50"
       )}>
         {phase}
       </span>
@@ -280,8 +280,8 @@ export default function TestExecution() {
           {/* Main Info Display (Replaces Timer) */}
           {state.isStarted && state.elapsedTime < 0 ? (
             <div className="py-8 space-y-4">
-              <span className="text-xs uppercase tracking-[0.2em] font-bold text-white/40">{t('startingIn')}</span>
-              <p className="font-mono font-black text-7xl text-primary animate-pulse">
+              <span className="text-xs uppercase tracking-[0.2em] font-bold text-white/70">{t('startingIn')}</span>
+              <p className="font-mono font-black text-7xl text-primary-bright animate-pulse">
                 {Math.abs(state.elapsedTime).toFixed(1)}s
               </p>
             </div>
@@ -294,7 +294,7 @@ export default function TestExecution() {
               )}>
                 <span className={cn(
                   "text-[10px] sm:text-xs uppercase tracking-[0.2em] font-bold mb-1",
-                  state.isStarted ? "text-white/40" : "text-muted-foreground"
+                  state.isStarted ? "text-white/70" : "text-muted-foreground"
                 )}>{t('distance')}</span>
                 <div className="flex items-baseline gap-1">
                   <span className={cn(
@@ -315,9 +315,12 @@ export default function TestExecution() {
               )}>
                 <span className={cn(
                   "text-[10px] sm:text-xs uppercase tracking-[0.2em] font-bold mb-1",
-                  state.isStarted ? "text-primary/70" : "text-primary/70"
+                  state.isStarted ? "text-primary-bright" : "text-primary/70"
                 )}>{t('repetition')}</span>
-                <div className="flex flex-col items-center text-primary leading-none">
+                <div className={cn(
+                  "flex flex-col items-center leading-none",
+                  state.isStarted ? "text-primary-bright" : "text-primary"
+                )}>
                   <span className={cn(
                     "font-mono font-black tracking-tighter",
                     state.isStarted ? "text-6xl sm:text-7xl" : "text-5xl sm:text-6xl"
@@ -341,7 +344,7 @@ export default function TestExecution() {
                       style={{ width: `${phaseProgress}%` }}
                     />
                   </div>
-                  <span className="block text-[9px] font-black uppercase tracking-widest text-primary animate-pulse">
+                  <span className="block text-[9px] font-black uppercase tracking-widest text-primary-bright animate-pulse">
                     {t('prepare')}
                   </span>
                 </div>
@@ -374,51 +377,51 @@ export default function TestExecution() {
           )}
 
           {/* Stage & PV Info */}
-          <div className="flex justify-between items-end mt-4 px-2 border-t border-white/5 pt-4">
+          <div className="mt-4 px-2 border-t border-white/10 pt-4 space-y-3">
             <div className="flex items-center gap-2">
               <div className={cn(
                 "w-2 h-2 rounded-full animate-pulse",
                 state.isRunning ? "bg-success" : "bg-warning"
               )} />
-              <span className="text-sm font-medium">
+              <span className="text-sm font-semibold">
                 {state.isRunning ? t('statusRunning') : t('statusPaused')}
               </span>
             </div>
-            <div className="text-right">
-              <p className={cn(
-                "text-[10px] uppercase tracking-[0.15em] font-bold",
-                state.isStarted ? "text-white/30" : "text-muted-foreground"
-              )}>{t('speed')}</p>
-              <p className="text-xl font-mono font-black text-primary">
-                {state.currentSpeed.toFixed(1)} <span className="text-xs font-bold opacity-50">km/h</span>
-              </p>
+            <div className={cn(
+              "grid gap-2",
+              state.isRunning ? "grid-cols-2" : "grid-cols-1"
+            )}>
+              <div className={cn("text-center", state.isRunning && "border-r border-white/10")}>
+                <p className={cn(
+                  "text-[10px] uppercase tracking-[0.15em] font-bold",
+                  state.isStarted ? "text-white/70" : "text-muted-foreground"
+                )}>{t('speed')}</p>
+                <p className={cn(
+                  "text-2xl font-mono font-black",
+                  state.isStarted ? "text-primary-bright" : "text-primary"
+                )}>
+                  {state.currentSpeed.toFixed(1)} <span className="text-xs font-bold opacity-70">km/h</span>
+                </p>
+              </div>
+              {state.isRunning && (
+                <div className="text-center">
+                  <p className={cn(
+                    "text-[10px] uppercase tracking-[0.15em] font-bold",
+                    state.isStarted ? "text-white/70" : "text-muted-foreground"
+                  )}>{t('correctedPVTCAR')}</p>
+                  <p className={cn(
+                    "text-2xl font-mono font-black",
+                    state.isStarted ? "text-primary-bright" : "text-primary"
+                  )}>
+                    {PVTableService.getCorrectedPV(
+                      selectedProtocol.level,
+                      PVTableService.calculateTotalReps(state.currentStage - 1, state.currentRep, false)
+                    ).toFixed(1)}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-
-        {/* Speed & PV */}
-        <div className="mt-4 space-y-1">
-          <div className={cn(
-            "flex justify-center gap-4 text-xs font-medium",
-            state.isStarted ? "text-black/50" : "text-muted-foreground"
-          )}>
-            <span>{t('currentSpeed')}: {state.currentSpeed.toFixed(1)} km/h</span>
-          </div>
-
-          {state.isRunning && (
-            <div className="pt-2 text-center">
-              <p className={cn(
-                "text-[10px] uppercase tracking-[0.15em] font-bold",
-                state.isStarted ? "text-black/80" : "text-muted-foreground"
-              )}>{t('correctedPVTCAR')}</p>
-              <p className="text-3xl font-mono font-black text-primary mt-0.5">
-                {PVTableService.getCorrectedPV(
-                  selectedProtocol.level,
-                  PVTableService.calculateTotalReps(state.currentStage - 1, state.currentRep, false)
-                ).toFixed(1)}
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
