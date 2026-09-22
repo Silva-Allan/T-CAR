@@ -29,7 +29,32 @@ jobs:
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
-          rsync -az --delete \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes" \
-            dist/ deploy@"$VPS_HOST":/
+
+          # ssh-keyscan pode falhar silenciosamente numa instabilidade
+          # passageira de rede do runner — tenta algumas vezes antes de
+          # desistir, em vez de derrubar o deploy inteiro por um blip.
+          for attempt in 1 2 3 4 5; do
+            if ssh-keyscan -T 15 -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/tmp/keyscan.err && [ -s ~/.ssh/known_hosts ]; then
+              break
+            fi
+            echo "ssh-keyscan falhou (tentativa $attempt/5):"
+            cat /tmp/keyscan.err
+            if [ "$attempt" = 5 ]; then
+              echo "Desisti depois de 5 tentativas."
+              exit 1
+            fi
+            sleep 5
+          done
+
+          for attempt in 1 2 3; do
+            if rsync -az --delete \
+              -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ConnectTimeout=15" \
+              dist/ deploy@"$VPS_HOST":/; then
+              exit 0
+            fi
+            echo "rsync falhou (tentativa $attempt/3)"
+            if [ "$attempt" = 3 ]; then
+              exit 1
+            fi
+            sleep 5
+          done
