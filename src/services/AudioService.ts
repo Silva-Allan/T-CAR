@@ -8,6 +8,7 @@
 // ======================================================================
 
 import { Logger } from '@/utils/Logger';
+import { AUDIO_INTRO_OFFSET } from '@/constants/audio';
 
 const PROTOCOL_AUDIO_FILES: Record<string, string> = {
   pt: '/audio/Audio T-car 10 BPM_BR.mp3',
@@ -25,6 +26,16 @@ class AudioServiceClass {
   private protocolLoaded = false;
   private isProtocolPlaying = false;
   private currentLanguage = 'pt';
+
+  // Estado de resiliência: distingue pausa deliberada do app de uma
+  // interrupção externa (queda de rede, troca de rota de Bluetooth, etc.)
+  // e tenta religar o áudio automaticamente quando as condições melhoram.
+  private appInitiatedPause = false;
+  private testInProgress = false;
+  private needsReloadOnRecovery = false;
+  private elapsedProvider: (() => number) | null = null;
+  private recoveryIntervalId: number | null = null;
+  private warmedLanguages = new Set<string>();
 
   private permissionGranted = false;
 
@@ -113,6 +124,7 @@ class AudioServiceClass {
       this.protocolAudio = new Audio(audioFile);
       this.protocolAudio.volume = this.volume;
       this.protocolAudio.preload = 'auto';
+      this.attachPlaybackWatchers(this.protocolAudio);
 
       await new Promise<void>((resolve) => {
         if (!this.protocolAudio) return resolve();
@@ -135,6 +147,37 @@ class AudioServiceClass {
   }
 
   /**
+   * Escuta o estado real do elemento de áudio durante a reprodução, para
+   * detectar interrupções que o app não causou (queda de rede, troca de
+   * rota de Bluetooth, erro de mídia) e nunca depender só da flag interna
+   * `isProtocolPlaying` — que sozinha pode ficar "true" para sempre mesmo
+   * com o áudio de fato parado.
+   */
+  private attachPlaybackWatchers(audio: HTMLAudioElement): void {
+    const markStalled = (reason: string) => {
+      if (this.appInitiatedPause) return; // pausa deliberada, não é interrupção
+      if (this.isProtocolPlaying) {
+        Logger.warn(`[AudioService] Interrupção externa detectada (${reason}) — cronômetro cai para relógio de parede`);
+      }
+      this.isProtocolPlaying = false;
+    };
+
+    audio.addEventListener('pause', () => markStalled('pause'));
+    audio.addEventListener('stalled', () => markStalled('stalled'));
+    audio.addEventListener('waiting', () => markStalled('waiting'));
+    audio.addEventListener('error', () => {
+      this.needsReloadOnRecovery = true;
+      markStalled('error');
+    });
+    audio.addEventListener('ended', () => markStalled('ended'));
+    audio.addEventListener('playing', () => {
+      if (!this.testInProgress) return;
+      this.isProtocolPlaying = true;
+      this.updateMediaSession('playing');
+    });
+  }
+
+  /**
    * Inicia a reprodução do áudio do protocolo (do início).
    * Chamado quando o teste começa.
    * Se já estiver tocando, NÃO reinicia (previne duplicação).
@@ -148,6 +191,8 @@ class AudioServiceClass {
 
     this.protocolAudio.currentTime = 0;
     this.protocolAudio.volume = this.volume;
+    this.testInProgress = true;
+    this.needsReloadOnRecovery = false;
     this.protocolAudio.play()
       .then(() => {
         this.isProtocolPlaying = true;
@@ -157,6 +202,10 @@ class AudioServiceClass {
       .catch(err => {
         Logger.error('[AudioService] Erro ao iniciar áudio:', err);
       });
+
+    if (this.recoveryIntervalId === null) {
+      this.recoveryIntervalId = window.setInterval(() => this.attemptRecovery(), 2000);
+    }
   }
 
   /**
@@ -165,7 +214,9 @@ class AudioServiceClass {
    */
   pauseProtocolAudio(): void {
     if (!this.protocolAudio || !this.isProtocolPlaying) return;
+    this.appInitiatedPause = true;
     this.protocolAudio.pause();
+    this.appInitiatedPause = false;
     this.updateMediaSession('paused');
     Logger.log('[AudioService] Áudio do protocolo pausado em:', this.protocolAudio.currentTime.toFixed(1) + 's');
   }
@@ -188,12 +239,93 @@ class AudioServiceClass {
    * Chamado quando o teste termina ou é cancelado.
    */
   stopProtocolAudio(): void {
+    this.testInProgress = false;
+    this.needsReloadOnRecovery = false;
+    this.elapsedProvider = null;
+    if (this.recoveryIntervalId !== null) {
+      clearInterval(this.recoveryIntervalId);
+      this.recoveryIntervalId = null;
+    }
+
     if (!this.protocolAudio) return;
+    this.appInitiatedPause = true;
     this.protocolAudio.pause();
+    this.appInitiatedPause = false;
     this.protocolAudio.currentTime = 0;
     this.isProtocolPlaying = false;
     this.updateMediaSession('none');
     Logger.log('[AudioService] Áudio do protocolo parado');
+  }
+
+  /**
+   * Fornece ao AudioService o `elapsed` mais recente do motor do teste,
+   * usado para religar o áudio no ponto certo após uma interrupção.
+   */
+  setElapsedProvider(getElapsed: () => number): void {
+    this.elapsedProvider = getElapsed;
+  }
+
+  /**
+   * Marca o áudio como travado por causa externa (chamado pelo watchdog
+   * do motor do teste, como reforço aos listeners nativos em situações
+   * em que nenhum evento de mídia chegou a disparar).
+   */
+  markExternallyStalled(): void {
+    this.isProtocolPlaying = false;
+  }
+
+  /**
+   * Tenta religar o áudio do protocolo depois de uma interrupção externa
+   * (queda de rede, troca de rota de Bluetooth, erro de mídia). Reposiciona
+   * sempre pelo `elapsed` ao vivo do motor do teste — nunca continua do
+   * `currentTime` congelado antigo, o que evitaria pular ou duplicar bipes.
+   * Roda a cada 2s enquanto o teste estiver em andamento; falhas (ex: ainda
+   * sem rede) são silenciosas e a próxima tentativa cobre o caso.
+   */
+  private attemptRecovery(): void {
+    if (!this.testInProgress || !this.protocolAudio || this.isProtocolPlaying) return;
+
+    if (this.needsReloadOnRecovery) {
+      this.protocolAudio.load();
+      this.needsReloadOnRecovery = false;
+    }
+
+    const target = (this.elapsedProvider?.() ?? 0) + AUDIO_INTRO_OFFSET;
+    this.protocolAudio.currentTime = Math.max(0, target);
+    this.protocolAudio.volume = this.volume;
+    this.protocolAudio.play()
+      .then(() => {
+        this.isProtocolPlaying = true;
+        this.updateMediaSession('playing');
+        Logger.log(`[AudioService] Recuperado, retomando em ${target.toFixed(1)}s`);
+      })
+      .catch(() => {
+        // Ainda sem condições (rede/BT) — a próxima tentativa em 2s cobre isso.
+      });
+  }
+
+  /**
+   * Garante que o MP3 do protocolo do idioma informado esteja completamente
+   * em cache (Service Worker) antes que o teste precise dele — assim a
+   * reprodução durante o teste não depende de fetches de rede ao vivo.
+   * Chamado o mais cedo possível (na entrada do app), não bloqueia nada:
+   * falhas caem de volta no comportamento atual sob demanda.
+   */
+  async ensureFullyCached(lang?: string): Promise<void> {
+    const targetLang = lang ?? this.currentLanguage;
+    if (this.warmedLanguages.has(targetLang)) return;
+
+    const audioFile = PROTOCOL_AUDIO_FILES[targetLang] ?? PROTOCOL_AUDIO_FILES['pt'];
+    try {
+      const response = await fetch(audioFile);
+      if (response.ok) {
+        await response.arrayBuffer();
+        this.warmedLanguages.add(targetLang);
+        Logger.log(`[AudioService] Áudio do protocolo (${targetLang}) pré-aquecido em cache`);
+      }
+    } catch (error) {
+      Logger.warn('[AudioService] Falha ao pré-aquecer áudio do protocolo:', error);
+    }
   }
 
   /**
@@ -296,14 +428,16 @@ class AudioServiceClass {
   /**
    * Toca BIP de falha — tom grave sintetizado (não está no áudio principal).
    */
-  playFailBeep(): void {
+  async playFailBeep(): Promise<void> {
+    await this.resume();
     this.playTone(330, 0.3, this.volume);
   }
 
   /**
    * Toca BIP de fim de teste — sequência descendente sintetizada.
    */
-  playEndBeep(): void {
+  async playEndBeep(): Promise<void> {
+    await this.resume();
     this.playTone(880, 0.2, this.volume);
     setTimeout(() => this.playTone(660, 0.2, this.volume), 200);
     setTimeout(() => this.playTone(440, 0.3, this.volume), 400);

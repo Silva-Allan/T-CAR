@@ -52,6 +52,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  // Pré-aquece o cache do áudio do protocolo assim que o app carrega —
+  // bem antes de qualquer teste começar — para reduzir a chance de o
+  // áudio depender de rede ao vivo durante a execução (não bloqueia nada).
+  useEffect(() => {
+    AudioService.ensureFullyCached(settings.language || 'pt');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Apply settings to audio service
   useEffect(() => {
     AudioService.setVolume(settings.volume);
@@ -59,6 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     AudioService.setLanguage(settings.language || 'pt');
+    AudioService.ensureFullyCached(settings.language || 'pt');
   }, [settings.language]);
 
   const initializeAudio = async (): Promise<boolean> => {

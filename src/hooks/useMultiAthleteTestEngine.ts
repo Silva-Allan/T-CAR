@@ -3,6 +3,7 @@ import { TestProtocol, AthleteTestState, AthleteResult, Athlete } from '@/models
 import { AudioService } from '@/services/AudioService';
 import { CalculatorService } from '@/services/CalculatorService';
 import { Logger } from '@/utils/Logger';
+import { AUDIO_INTRO_OFFSET } from '@/constants/audio';
 
 interface MultiAthleteTestState {
   isRunning: boolean;
@@ -34,11 +35,7 @@ const INITIAL_STATE: MultiAthleteTestState = {
   allEliminated: false,
 };
 
-// ======================================================================
-// AUDIO OFFSET: tempo (em segundos) de introdução do MP3 antes do
-// primeiro beep de corrida. O timer do teste começa a contar a partir
-// deste ponto no áudio.
-export const AUDIO_INTRO_OFFSET = 6; // seconds — ajustado ao áudio real do protocolo
+export { AUDIO_INTRO_OFFSET };
 
 export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athlete[]) {
   const [state, setState] = useState<MultiAthleteTestState>(() => ({
@@ -63,6 +60,13 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
   const beepSyncedRef = useRef<boolean>(false);
   // Cooldown por atleta para evitar duplo-clique acidental no botão de falha
   const failureCooldownRef = useRef<Record<string, number>>({});
+  // Espelha o último `elapsed` calculado — usado pelo AudioService para
+  // religar o áudio no ponto certo depois de uma interrupção externa.
+  const elapsedRef = useRef<number>(0);
+  // Watchdog: detecta currentTime do áudio "congelado" mesmo sem disparo
+  // de evento nativo (defesa extra, além dos listeners do AudioService).
+  const lastAudioTimeRef = useRef<number>(-1);
+  const audioStuckSinceRef = useRef<number | null>(null);
 
   // Update protocol values when protocol changes
   useEffect(() => {
@@ -109,9 +113,16 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
     accumulatedPauseRef.current = 0;
     audioStartedRef.current = false;
     beepSyncedRef.current = false;
+    elapsedRef.current = 0;
+    lastAudioTimeRef.current = -1;
+    audioStuckSinceRef.current = null;
 
     // Start the protocol audio (MP3 with all timed beeps)
     AudioService.startProtocolAudio();
+    // Dá ao AudioService acesso ao `elapsed` mais recente, para que uma
+    // eventual recuperação (áudio travado por queda de rede/BT) religue
+    // o áudio exatamente no ponto certo, nunca do valor congelado antigo.
+    AudioService.setElapsedProvider(() => elapsedRef.current);
 
     intervalRef.current = window.setInterval(() => {
       setState(prev => {
@@ -124,6 +135,27 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
         // =================================================================
         let elapsed: number;
         const audioTime = AudioService.getProtocolAudioTime();
+
+        // WATCHDOG: reforço além dos listeners nativos do AudioService —
+        // se o áudio "deveria" estar tocando mas o currentTime não avança
+        // por mais de 400ms, trata como travado (sem depender de nenhum
+        // evento do <audio> ter disparado) e cai pro relógio de parede.
+        if (audioTime >= 0) {
+          if (audioTime === lastAudioTimeRef.current) {
+            if (audioStuckSinceRef.current === null) {
+              audioStuckSinceRef.current = Date.now();
+            } else if (Date.now() - audioStuckSinceRef.current > 400) {
+              AudioService.markExternallyStalled();
+            }
+          } else {
+            lastAudioTimeRef.current = audioTime;
+            audioStuckSinceRef.current = null;
+          }
+        } else {
+          lastAudioTimeRef.current = -1;
+          audioStuckSinceRef.current = null;
+        }
+
         // JS Clock also needs to account for the intro offset to be a valid comparison
         const wallClockElapsedRaw = (Date.now() - startTimeRef.current - accumulatedPauseRef.current) / 1000;
         const wallClockElapsed = wallClockElapsedRaw - AUDIO_INTRO_OFFSET; // Allows negative values
@@ -166,6 +198,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
         }
 
         const newElapsedTime = elapsed;
+        elapsedRef.current = newElapsedTime;
 
         // If elapsed is negative, we are in the intro phase
         let phase: 'idle' | 'going' | 'returning' | 'recovery';

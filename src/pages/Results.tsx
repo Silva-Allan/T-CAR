@@ -547,7 +547,7 @@ export default function Results() {
             <AlertDialogTitle>{t('unsavedTestTitle')}</AlertDialogTitle>
             <AlertDialogDescription>{t('unsavedTestDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
             <AlertDialogCancel onClick={() => setPendingNav(null)}>
               {t('cancel')}
             </AlertDialogCancel>
