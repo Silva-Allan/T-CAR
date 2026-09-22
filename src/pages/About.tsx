@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ExternalLink, Activity, BookOpen, Download, FileText, Star,
+  ExternalLink, BookOpen, Download, FileText, Star,
   ChevronDown, ChevronUp, Play, Youtube, Info, Dumbbell, MapPin,
   GraduationCap, Building2, Handshake, Rocket
 } from 'lucide-react';
@@ -54,9 +54,7 @@ export default function About() {
 
         {/* ── Hero ── */}
         <div className="text-center py-6 px-4">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 mb-4 shadow-inner">
-            <Activity className="w-10 h-10 text-primary" />
-          </div>
+          <img src="/pwa-192x192.png" alt="T-CAR" className="w-20 h-20 rounded-2xl mb-4 shadow-inner mx-auto" />
           <h2 className="text-2xl font-black tracking-tight">{t('aboutHeroTitle')}</h2>
           <p className="text-muted-foreground mt-1 text-sm leading-relaxed max-w-sm mx-auto">
             {t('aboutHeroDesc')}

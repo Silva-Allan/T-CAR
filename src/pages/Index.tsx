@@ -6,7 +6,6 @@ import {
   History,
   Settings,
   Info,
-  Activity,
   BarChart3,
   Book,
 } from 'lucide-react';
@@ -39,9 +38,7 @@ export default function Index() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background">
         <div className="relative mb-8">
-          <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Activity className="w-12 h-12 text-primary animate-pulse" />
-          </div>
+          <img src="/pwa-192x192.png" alt="T-CAR" className="w-24 h-24 rounded-2xl animate-pulse" />
           <div className="absolute inset-0 rounded-2xl border-2 border-primary/20 animate-ping" />
         </div>
         <h1 className="text-3xl font-black tracking-tight mb-1">T-CAR</h1>
@@ -56,9 +53,7 @@ export default function Index() {
       <header className="branded-header px-6 pt-8 pb-10">
         <div className="max-w-md mx-auto">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-              <Activity className="w-5 h-5 text-white" />
-            </div>
+            <img src="/pwa-192x192.png" alt="T-CAR" className="w-10 h-10 rounded-xl" />
             <div>
               <h1 className="text-lg font-black text-white tracking-tight">T-CAR</h1>
               <p className="text-[10px] text-white/50 font-semibold tracking-[0.2em] uppercase">

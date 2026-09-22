@@ -85,9 +85,11 @@ export default function Auth() {
       <div className="w-full max-w-sm space-y-8">
         {/* Logo */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground text-2xl font-black mb-4">
-            T
-          </div>
+          <img
+            src="/pwa-192x192.png"
+            alt="T-CAR"
+            className="w-20 h-20 mx-auto rounded-2xl mb-4"
+          />
           <h1 className="text-2xl font-bold">{t('authTitle')}</h1>
           <p className="text-muted-foreground">
             {mode === 'login' ? t('enterAccount') : mode === 'signup' ? t('createAccount') : t('recoverPassword')}
