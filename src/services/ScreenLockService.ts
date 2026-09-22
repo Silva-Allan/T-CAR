@@ -7,6 +7,8 @@
 // - Visibility Change: detecta interrupções
 // ======================================================================
 
+import { Logger } from '@/utils/Logger';
+
 type VisibilityCallback = (isVisible: boolean) => void;
 
 type OrientationLockType =
@@ -38,19 +40,19 @@ class ScreenLockServiceClass {
         try {
             if ('wakeLock' in navigator) {
                 this.wakeLock = await navigator.wakeLock.request('screen');
-                console.log('Wake Lock ativado');
+                Logger.log('Wake Lock ativado');
 
                 // Re-adquirir wake lock se a tela for desbloqueada
                 this.wakeLock.addEventListener('release', () => {
-                    console.log('Wake Lock liberado');
+                    Logger.log('Wake Lock liberado');
                 });
 
                 return true;
             }
-            console.warn('Wake Lock API não suportada');
+            Logger.warn('Wake Lock API não suportada');
             return false;
         } catch (error) {
-            console.error('Erro ao solicitar Wake Lock:', error);
+            Logger.error('Erro ao solicitar Wake Lock:', error);
             return false;
         }
     }
@@ -64,13 +66,13 @@ class ScreenLockServiceClass {
                 // Usando assertion porque a API Screen Orientation pode não estar completa nos tipos padrão
                 await (screen.orientation as any).lock(orientation);
                 this.orientationLocked = true;
-                console.log(`Orientação bloqueada: ${orientation}`);
+                Logger.log(`Orientação bloqueada: ${orientation}`);
                 return true;
             }
-            console.warn('Screen Orientation Lock não suportado');
+            Logger.warn('Screen Orientation Lock não suportado');
             return false;
         } catch (error) {
-            console.warn('Não foi possível bloquear orientação:', error);
+            Logger.warn('Não foi possível bloquear orientação:', error);
             return false;
         }
     }
@@ -128,9 +130,9 @@ class ScreenLockServiceClass {
             try {
                 await this.wakeLock.release();
                 this.wakeLock = null;
-                console.log('Wake Lock liberado');
+                Logger.log('Wake Lock liberado');
             } catch (error) {
-                console.error('Erro ao liberar Wake Lock:', error);
+                Logger.error('Erro ao liberar Wake Lock:', error);
             }
         }
 
@@ -140,10 +142,10 @@ class ScreenLockServiceClass {
                 if (screen.orientation && 'unlock' in screen.orientation) {
                     screen.orientation.unlock();
                     this.orientationLocked = false;
-                    console.log('Orientação desbloqueada');
+                    Logger.log('Orientação desbloqueada');
                 }
             } catch (error) {
-                console.warn('Erro ao desbloquear orientação:', error);
+                Logger.warn('Erro ao desbloquear orientação:', error);
             }
         }
 

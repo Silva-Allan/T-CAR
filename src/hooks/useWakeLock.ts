@@ -6,26 +6,27 @@
 // ======================================================================
 
 import { useRef, useCallback } from 'react';
+import { Logger } from '@/utils/Logger';
 
 export function useWakeLock() {
     const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
     const requestWakeLock = useCallback(async () => {
         if (!('wakeLock' in navigator)) {
-            console.warn('[WakeLock] Screen Wake Lock API não suportada neste dispositivo');
+            Logger.warn('[WakeLock] Screen Wake Lock API não suportada neste dispositivo');
             return;
         }
 
         try {
             wakeLockRef.current = await navigator.wakeLock.request('screen');
-            console.log('[WakeLock] Tela mantida ativa');
+            Logger.log('[WakeLock] Tela mantida ativa');
 
             wakeLockRef.current.addEventListener('release', () => {
-                console.log('[WakeLock] Wake lock liberado');
+                Logger.log('[WakeLock] Wake lock liberado');
                 wakeLockRef.current = null;
             });
         } catch (err: any) {
-            console.warn('[WakeLock] Erro ao solicitar wake lock:', err.message);
+            Logger.warn('[WakeLock] Erro ao solicitar wake lock:', err.message);
         }
     }, []);
 
@@ -34,9 +35,9 @@ export function useWakeLock() {
             try {
                 await wakeLockRef.current.release();
                 wakeLockRef.current = null;
-                console.log('[WakeLock] Tela liberada');
+                Logger.log('[WakeLock] Tela liberada');
             } catch (err: any) {
-                console.warn('[WakeLock] Erro ao liberar wake lock:', err.message);
+                Logger.warn('[WakeLock] Erro ao liberar wake lock:', err.message);
             }
         }
     }, []);

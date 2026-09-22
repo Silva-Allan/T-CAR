@@ -11,6 +11,7 @@ import { useApp } from '@/store/AppContext';
 import { Athlete } from '@/models/types';
 import { cn } from '@/lib/utils';
 import { AthleteFilterBar, applyAthleteFilters, EMPTY_FILTERS, type AthleteFilters } from '@/components/AthleteFilterBar';
+import { Logger } from '@/utils/Logger';
 
 const MAX_ATHLETES = 10;
 const MIN_ATHLETES = 1;
@@ -80,7 +81,7 @@ export default function SelectAthletes() {
       setHasMore(athletesRaw.length === PAGE_SIZE);
       setPage(pageToLoad);
     } catch (error) {
-      console.error('Error loading athletes:', error);
+      Logger.error('Error loading athletes:', error);
     } finally {
       setLoading(false);
       setLoadingMore(false);

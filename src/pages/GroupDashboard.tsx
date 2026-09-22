@@ -4,6 +4,7 @@ import {
     Users, Trophy, TrendingUp, Loader2, Download, FileText,
     ChevronRight, BarChart3
 } from 'lucide-react';
+import { Logger } from '@/utils/Logger';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { SupabaseService } from '@/services/SupabaseService';
@@ -50,7 +51,7 @@ export default function GroupDashboard() {
                 setRanking(rankingData);
                 setTrainerProfile(profileData);
             } catch (error) {
-                console.error('Error loading ranking:', error);
+                Logger.error('Error loading ranking:', error);
             } finally {
                 setLoading(false);
             }
@@ -92,7 +93,7 @@ export default function GroupDashboard() {
                 team: trainerProfile?.club || undefined
             });
         } catch (error) {
-            console.error('Error exporting PDF:', error);
+            Logger.error('Error exporting PDF:', error);
         } finally {
             setExporting(false);
         }

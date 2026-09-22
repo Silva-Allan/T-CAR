@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { TestProtocol, AthleteTestState, AthleteResult, Athlete } from '@/models/types';
 import { AudioService } from '@/services/AudioService';
 import { CalculatorService } from '@/services/CalculatorService';
+import { Logger } from '@/utils/Logger';
 
 interface MultiAthleteTestState {
   isRunning: boolean;
@@ -135,7 +136,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
             startTimeRef.current = Date.now();
             accumulatedPauseRef.current = 0;
             audioStartedRef.current = true;
-            console.log(`[AudioSync] Audio playback detected at ${audioTime.toFixed(2)}s. Syncing JS clock.`);
+            Logger.log(`[AudioSync] Audio playback detected at ${audioTime.toFixed(2)}s. Syncing JS clock.`);
           }
 
           // STAGE 2: Sincronia Rígida no BIPE (7.4s)
@@ -145,7 +146,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
             startTimeRef.current = Date.now() - (AUDIO_INTRO_OFFSET * 1000);
             accumulatedPauseRef.current = 0;
             beepSyncedRef.current = true;
-            console.log(`[AudioSync] HARD SYNC: Áudio atingiu ${AUDIO_INTRO_OFFSET}s (BIPE). Cronômetro zerado e sincronizado.`);
+            Logger.log(`[AudioSync] HARD SYNC: Áudio atingiu ${AUDIO_INTRO_OFFSET}s (BIPE). Cronômetro zerado e sincronizado.`);
           }
 
           // Audio is playing — use its time as master clock
@@ -156,7 +157,7 @@ export function useMultiAthleteTestEngine(protocol: TestProtocol, athletes: Athl
           if (beepSyncedRef.current) {
             const drift = Math.abs(elapsed - wallClockElapsed);
             if (drift > 0.1) { // 100ms drift threshold
-              console.log(`[AudioSync] Drift detected: ${(drift * 1000).toFixed(0)}ms. Master=${elapsed.toFixed(2)}s, JS=${wallClockElapsed.toFixed(2)}s`);
+              Logger.log(`[AudioSync] Drift detected: ${(drift * 1000).toFixed(0)}ms. Master=${elapsed.toFixed(2)}s, JS=${wallClockElapsed.toFixed(2)}s`);
             }
           }
         } else {

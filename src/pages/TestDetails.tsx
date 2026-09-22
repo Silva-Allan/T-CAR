@@ -11,6 +11,7 @@ import { ClassificationService } from '@/services/ClassificationService';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
+import { Logger } from '@/utils/Logger';
 
 interface TestWithResults {
   id: string;
@@ -63,7 +64,7 @@ export default function TestDetails() {
         }
         setTrainerProfile(profileData);
       } catch (error) {
-        console.error('Error loading test:', error);
+        Logger.error('Error loading test:', error);
       } finally {
         setLoading(false);
       }
@@ -113,7 +114,7 @@ export default function TestDetails() {
         }
       );
     } catch (error) {
-      console.error('Erro ao exportar PDF:', error);
+      Logger.error('Erro ao exportar PDF:', error);
     } finally {
       setExporting(false);
     }

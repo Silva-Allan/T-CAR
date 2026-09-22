@@ -147,7 +147,7 @@ class SyncServiceClass {
                 } catch (error) {
                     failCount++;
                     const errMsg = error instanceof Error ? error.message : String(error);
-                    console.error(`[SyncService] ❌ Falha no item ${item.id}:`, error);
+                    Logger.error(`[SyncService] ❌ Falha no item ${item.id}:`, error);
                     LOG(`❌ Erro no item ${item.id}: ${errMsg}`);
                     await IndexedDBService.incrementRetryCount(item.id);
                     this.lastError = errMsg;
@@ -163,7 +163,7 @@ class SyncServiceClass {
             LOG(`🏁 Sincronização concluída: ✅ ${successCount} sucesso(s), ❌ ${failCount} falha(s).`);
         } catch (error) {
             const errMsg = error instanceof Error ? error.message : String(error);
-            console.error('[SyncService] Erro geral:', error);
+            Logger.error('[SyncService] Erro geral:', error);
             LOG(`💥 Erro geral na sincronização: ${errMsg}`);
             this.lastError = errMsg;
         } finally {

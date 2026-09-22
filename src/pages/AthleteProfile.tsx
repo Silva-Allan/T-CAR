@@ -4,6 +4,7 @@ import {
   User, TrendingUp, TrendingDown, Minus, Calendar, Trophy, Loader2,
   Download, Heart, Activity, ChevronDown
 } from 'lucide-react';
+import { Logger } from '@/utils/Logger';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/test/StatCard';
@@ -68,7 +69,7 @@ export default function AthleteProfile() {
         setTrainerProfile(profileData);
         await loadTests(0, true);
       } catch (error) {
-        console.error('Error loading athlete:', error);
+        Logger.error('Error loading athlete:', error);
       } finally {
         setLoading(false);
       }
@@ -114,7 +115,7 @@ export default function AthleteProfile() {
       setHasMore(normalized.length === PAGE_SIZE);
       setPage(pageToLoad);
     } catch (error) {
-      console.error('Error loading history:', error);
+      Logger.error('Error loading history:', error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -253,7 +254,7 @@ export default function AthleteProfile() {
         { chartImage, team: (trainerProfile as any)?.club ?? undefined, classification, lastTestDate: lastTest?.test.date ?? undefined }
       );
     } catch (error) {
-      console.error('Erro ao exportar PDF:', error);
+      Logger.error('Erro ao exportar PDF:', error);
     }
   };
 

@@ -5,6 +5,8 @@
 // Usa IndexedDB (50MB+) ao invés de localStorage (5-10MB).
 // ======================================================================
 
+import { Logger } from '@/utils/Logger';
+
 const DB_NAME = 'tcar_db';
 const DB_VERSION = 1;
 
@@ -54,7 +56,7 @@ class IndexedDBServiceClass {
             };
 
             request.onerror = () => {
-                console.error('Erro ao abrir IndexedDB:', request.error);
+                Logger.error('Erro ao abrir IndexedDB:', request.error);
                 reject(request.error);
             };
         });
@@ -174,7 +176,7 @@ class IndexedDBServiceClass {
                     const putRequest = store.put(request.result);
                     putRequest.onerror = () => {
                         // Non-critical: retry counter update failed; item stays at old count.
-                        console.warn('[IndexedDB] Failed to increment retryCount for', id);
+                        Logger.warn('[IndexedDB] Failed to increment retryCount for', id);
                     };
                 }
             };

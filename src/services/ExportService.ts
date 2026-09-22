@@ -6,6 +6,7 @@
 // ======================================================================
 
 import { AthleteResult } from '@/models/types';
+import { Logger } from '@/utils/Logger';
 
 // Cores UDESC (mantidas)
 const UDESC_GREEN = [0, 102, 51] as const;       // #006633
@@ -482,7 +483,7 @@ class ExportServiceClass {
             const fileName = `tcar_teste_${new Date(date).toISOString().split('T')[0]}.pdf`;
             doc.save(fileName);
         } catch (error) {
-            console.error('Erro ao gerar PDF:', error);
+            Logger.error('Erro ao gerar PDF:', error);
             throw new Error('Não foi possível gerar o PDF.');
         }
     }
@@ -631,7 +632,7 @@ class ExportServiceClass {
             const fileName = `tcar_historico_${athleteName.replace(/\s+/g, '_')}.pdf`;
             doc.save(fileName);
         } catch (error) {
-            console.error('Erro ao gerar PDF do histórico:', error);
+            Logger.error('Erro ao gerar PDF do histórico:', error);
             throw new Error('Não foi possível gerar o PDF.');
         }
     }
@@ -711,7 +712,7 @@ class ExportServiceClass {
             const fileName = `tcar_ranking_${new Date().toISOString().split('T')[0]}.pdf`;
             doc.save(fileName);
         } catch (error) {
-            console.error('Erro ao gerar PDF do ranking:', error);
+            Logger.error('Erro ao gerar PDF do ranking:', error);
             throw new Error('Não foi possível gerar o PDF.');
         }
     }
@@ -798,7 +799,7 @@ class ExportServiceClass {
             });
             return canvas.toDataURL('image/png');
         } catch (error) {
-            console.error('Erro ao capturar gráfico:', error);
+            Logger.error('Erro ao capturar gráfico:', error);
             return null;
         }
     }

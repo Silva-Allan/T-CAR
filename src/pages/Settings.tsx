@@ -21,6 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Logger } from '@/utils/Logger';
 
 export default function Settings() {
   const { t } = useTranslation();
@@ -87,7 +88,7 @@ export default function Settings() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error('Erro ao exportar dados:', e);
+      Logger.error('Erro ao exportar dados:', e);
     } finally {
       setIsExporting(false);
     }
@@ -100,7 +101,7 @@ export default function Settings() {
       await signOut();
       setShowDeleteDialog(false);
     } catch (e) {
-      console.error('Erro ao excluir dados:', e);
+      Logger.error('Erro ao excluir dados:', e);
     } finally {
       setIsDeleting(false);
     }
@@ -127,7 +128,7 @@ export default function Settings() {
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 2500);
     } catch (e) {
-      console.error('Erro ao salvar perfil:', e);
+      Logger.error('Erro ao salvar perfil:', e);
     } finally {
       setSavingProfile(false);
     }

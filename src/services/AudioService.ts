@@ -7,6 +7,8 @@
 // Web Audio API como fallback para tons sintetizados (falha, fim).
 // ======================================================================
 
+import { Logger } from '@/utils/Logger';
+
 const PROTOCOL_AUDIO_FILES: Record<string, string> = {
   pt: '/audio/Audio T-car 10 BPM_BR.mp3',
   en: '/audio/Audio T-Car 10 BPM_ Eng.mp3',
@@ -46,7 +48,7 @@ class AudioServiceClass {
       this.permissionGranted = true;
       return true;
     } catch (error) {
-      console.error('Erro ao inicializar AudioContext:', error);
+      Logger.error('Erro ao inicializar AudioContext:', error);
       return false;
     }
   }
@@ -116,18 +118,18 @@ class AudioServiceClass {
         if (!this.protocolAudio) return resolve();
         this.protocolAudio.addEventListener('canplaythrough', () => {
           this.protocolLoaded = true;
-          console.log('[AudioService] Áudio do protocolo carregado');
+          Logger.log('[AudioService] Áudio do protocolo carregado');
           resolve();
         }, { once: true });
         this.protocolAudio.addEventListener('error', () => {
-          console.warn('[AudioService] Áudio do protocolo não encontrado');
+          Logger.warn('[AudioService] Áudio do protocolo não encontrado');
           this.protocolAudio = null;
           resolve();
         }, { once: true });
         this.protocolAudio.load();
       });
     } catch (error) {
-      console.warn('Erro ao carregar áudio do protocolo:', error);
+      Logger.warn('Erro ao carregar áudio do protocolo:', error);
       this.protocolAudio = null;
     }
   }
@@ -140,7 +142,7 @@ class AudioServiceClass {
   startProtocolAudio(): void {
     if (!this.protocolAudio) return;
     if (this.isProtocolPlaying) {
-      console.warn('[AudioService] Áudio do protocolo já está tocando');
+      Logger.warn('[AudioService] Áudio do protocolo já está tocando');
       return;
     }
 
@@ -150,10 +152,10 @@ class AudioServiceClass {
       .then(() => {
         this.isProtocolPlaying = true;
         this.updateMediaSession('playing');
-        console.log('[AudioService] Áudio do protocolo iniciado');
+        Logger.log('[AudioService] Áudio do protocolo iniciado');
       })
       .catch(err => {
-        console.error('[AudioService] Erro ao iniciar áudio:', err);
+        Logger.error('[AudioService] Erro ao iniciar áudio:', err);
       });
   }
 
@@ -165,7 +167,7 @@ class AudioServiceClass {
     if (!this.protocolAudio || !this.isProtocolPlaying) return;
     this.protocolAudio.pause();
     this.updateMediaSession('paused');
-    console.log('[AudioService] Áudio do protocolo pausado em:', this.protocolAudio.currentTime.toFixed(1) + 's');
+    Logger.log('[AudioService] Áudio do protocolo pausado em:', this.protocolAudio.currentTime.toFixed(1) + 's');
   }
 
   /**
@@ -177,7 +179,7 @@ class AudioServiceClass {
     this.protocolAudio.play()
       .then(() => this.updateMediaSession('playing'))
       .catch(err => {
-        console.warn('[AudioService] Erro ao retomar áudio:', err);
+        Logger.warn('[AudioService] Erro ao retomar áudio:', err);
       });
   }
 
@@ -191,7 +193,7 @@ class AudioServiceClass {
     this.protocolAudio.currentTime = 0;
     this.isProtocolPlaying = false;
     this.updateMediaSession('none');
-    console.log('[AudioService] Áudio do protocolo parado');
+    Logger.log('[AudioService] Áudio do protocolo parado');
   }
 
   /**
@@ -218,7 +220,7 @@ class AudioServiceClass {
       }
       navigator.mediaSession.playbackState = state;
     } catch (error) {
-      console.warn('[AudioService] Erro ao atualizar Media Session:', error);
+      Logger.warn('[AudioService] Erro ao atualizar Media Session:', error);
     }
   }
 
@@ -258,14 +260,14 @@ class AudioServiceClass {
         if (!this.instructionAudio) return resolve();
         this.instructionAudio.addEventListener('canplaythrough', () => resolve(), { once: true });
         this.instructionAudio.addEventListener('error', () => {
-          console.warn(`[AudioService] Instrução MP3 não encontrada em: ${audioPath}`);
+          Logger.warn(`[AudioService] Instrução MP3 não encontrada em: ${audioPath}`);
           this.instructionAudio = null;
           resolve();
         }, { once: true });
         this.instructionAudio.load();
       });
     } catch (error) {
-      console.warn('Erro ao carregar áudio de instrução:', error);
+      Logger.warn('Erro ao carregar áudio de instrução:', error);
       this.instructionAudio = null;
     }
   }
@@ -276,7 +278,7 @@ class AudioServiceClass {
       this.instructionAudio.currentTime = 0;
       await this.instructionAudio.play();
     } catch (error) {
-      console.warn('Erro ao tocar instrução:', error);
+      Logger.warn('Erro ao tocar instrução:', error);
     }
   }
 
@@ -329,7 +331,7 @@ class AudioServiceClass {
       oscillator.start(this.audioContext.currentTime);
       oscillator.stop(this.audioContext.currentTime + duration);
     } catch (error) {
-      console.error('Erro ao reproduzir tom:', error);
+      Logger.error('Erro ao reproduzir tom:', error);
     }
   }
 

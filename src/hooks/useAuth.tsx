@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { IndexedDBService } from '@/services/IndexedDBService';
+import { Logger } from '@/utils/Logger';
 
 interface AuthContextType {
   user: User | null;
@@ -127,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: t('authLogoutSuccessDesc')
       });
     } catch (e) {
-      console.error('Erro ao deslogar:', e);
+      Logger.error('Erro ao deslogar:', e);
     }
   };
 

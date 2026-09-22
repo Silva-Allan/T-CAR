@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Logger } from '@/utils/Logger';
 
 interface Athlete {
   id: string;
@@ -90,7 +91,7 @@ export default function Athletes() {
       setHasMore(data.length === PAGE_SIZE);
       setPage(pageToLoad);
     } catch (error) {
-      console.error('Error loading athletes:', error);
+      Logger.error('Error loading athletes:', error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -109,7 +110,7 @@ export default function Athletes() {
       const tests = await SupabaseService.getAthleteTestHistory(athleteId);
       setAthleteTests(prev => ({ ...prev, [athleteId]: tests as unknown as AthleteTest[] }));
     } catch (error) {
-      console.error('Error loading athlete tests:', error);
+      Logger.error('Error loading athlete tests:', error);
     }
   };
 
@@ -149,7 +150,7 @@ export default function Athletes() {
       await loadAthletes(0, true); // Reload all athletes after add/edit
       resetForm();
     } catch (error) {
-      console.error('Error saving athlete:', error);
+      Logger.error('Error saving athlete:', error);
     } finally {
       resetForm();
       setSubmitting(false);
@@ -174,7 +175,7 @@ export default function Athletes() {
       setAthletes(athletes.filter(a => a.id !== deleteId));
       setDeleteId(null);
     } catch (error) {
-      console.error('Error deleting athlete:', error);
+      Logger.error('Error deleting athlete:', error);
     }
   };
 

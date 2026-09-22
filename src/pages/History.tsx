@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Logger } from '@/utils/Logger';
 
 interface TestWithResults {
   id: string;
@@ -75,7 +76,7 @@ export default function History() {
       setHasMore(data.length === PAGE_SIZE);
       setPage(pageToLoad);
     } catch (error) {
-      console.error('Error loading tests:', error);
+      Logger.error('Error loading tests:', error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -95,7 +96,7 @@ export default function History() {
       setTests(tests.filter(t => t.id !== deleteId));
       setDeleteId(null);
     } catch (error) {
-      console.error('Error deleting test:', error);
+      Logger.error('Error deleting test:', error);
     }
   };
 
