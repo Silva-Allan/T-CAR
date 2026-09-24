@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { PwaUpdatePrompt } from "@/components/pwa/PwaUpdatePrompt";
+import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -35,6 +36,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <PwaUpdatePrompt />
+          <PwaInstallPrompt />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
