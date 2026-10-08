@@ -9,74 +9,53 @@ A cada push na `main`, o GitHub Actions aplica as migrations pendentes de
 - Cada migration roda numa transação. Se falhar, nada é aplicado e o deploy do frontend não acontece.
 - Sem os secrets configurados, o job só emite um aviso e o deploy segue como antes.
 
-## Configuração única no servidor
+## Como está configurado (produção)
 
-### 1. Gerar a chave (em qualquer máquina)
+- **Servidor:** VPS Hostinger. O Postgres roda no container `supabase-db` (Supabase self-hosted).
+- **Usuário SSH:** `deploy`, o mesmo do deploy do site. No `~/.ssh/authorized_keys` dele, cada chave do GitHub tem um comando fixo:
 
-```bash
-ssh-keygen -t ed25519 -N "" -C "github-actions-migrate" -f migrate_key
-```
+  | Chave (comentário) | Só consegue... |
+  | --- | --- |
+  | `github-actions-deploy-tcar` | `rrsync` para `/home/deploy/frontend-dist` (publicar o site) |
+  | `migrate-github-actions` | `docker exec -i supabase-db psql -U postgres -d postgres -X -q` |
 
-Isso gera `migrate_key` (privada, vai para o GitHub) e `migrate_key.pub` (pública, vai para o servidor).
+  Linha da chave de migrations:
 
-### 2. Criar o usuário restrito na VPS
+  ```
+  command="docker exec -i supabase-db psql -U postgres -d postgres -X -q",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... migrate-github-actions
+  ```
 
-> O usuário **precisa ter um shell real** (`/bin/bash`), não `/usr/sbin/nologin`
-> nem `/bin/false`. O sshd executa o `command="..."` através do shell do usuário,
-> e com `nologin`/`false` o comando nunca roda. A restrição de acesso vem do
-> `command=` + `no-pty`, não do shell.
+  Qualquer comando enviado com essa chave é ignorado: ela só abre o `psql`, que lê o SQL do stdin. Não dá shell.
 
-```bash
-sudo adduser --disabled-password --gecos "" --shell /bin/bash migrate
-sudo usermod -aG docker migrate        # só se o Postgres roda em Docker
-sudo mkdir -p /home/migrate/.ssh
-sudo chmod 700 /home/migrate/.ssh
-```
+- **Secrets no GitHub** (Settings → Secrets and variables → Actions):
 
-Em `/home/migrate/.ssh/authorized_keys`, coloque **uma linha** com a chave
-pública precedida do comando fixo. Assim a chave só consegue rodar `psql`,
-sem acesso ao shell:
+  | Secret | Valor |
+  | --- | --- |
+  | `MIGRATE_SSH_KEY` | chave privada `migrate-github-actions` |
+  | `MIGRATE_SSH_USER` | `deploy` |
+  | `VPS_HOST` | já existia, reaproveitado |
+  | `MIGRATE_PSQL_CMD` | opcional. Só necessário se a chave **não** tiver `command=` e o container não for `supabase-db` |
 
-```
-command="docker exec -i supabase-db psql -U postgres -d postgres -X -q",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA...conteúdo de migrate_key.pub... github-actions-migrate
-```
+- Na primeira execução, a migration inicial (`20260107051405_…`) foi só marcada como aplicada, porque o banco de produção já tinha esse schema.
+- Também dá para rodar o deploy e as migrations sem push: aba Actions → **Deploy frontend to VPS** → **Run workflow**.
 
-```bash
-sudo chown -R migrate:migrate /home/migrate/.ssh
-sudo chmod 600 /home/migrate/.ssh/authorized_keys
-```
-
-Ajuste o comando conforme o servidor:
-
-| Postgres roda em... | `command="..."` |
-| --- | --- |
-| Docker do Supabase self-hosted | `docker exec -i supabase-db psql -U postgres -d postgres -X -q` (confira o nome do container com `docker ps`) |
-| Outro container | `docker exec -i NOME_DO_CONTAINER psql -U postgres -d postgres -X -q` |
-| Direto na VPS | `psql -h localhost -U postgres -d postgres -X -q` (senha em `/home/migrate/.pgpass`) |
-
-### 3. Testar o acesso
+### Trocar a chave de migrations
 
 ```bash
-echo "select current_user, version();" | ssh -i migrate_key migrate@SEU_HOST
+ssh-keygen -t ed25519 -N "" -C "migrate-github-actions" -f migrate_key
 ```
 
-Tem que imprimir o usuário e a versão do Postgres.
+1. No servidor, substitua a linha `migrate-github-actions` em `/home/deploy/.ssh/authorized_keys` pela nova chave pública, **mantendo o `command=...` e as opções na frente**.
+2. Cole o conteúdo de `migrate_key` (privada) no secret `MIGRATE_SSH_KEY`.
+3. Apague os arquivos locais da chave.
 
-### 4. Cadastrar os secrets no GitHub
+### Se o job falhar
 
-Repositório → Settings → Secrets and variables → Actions → New repository secret:
+O script testa o acesso antes de aplicar qualquer coisa e mostra a saída do servidor e o código de saída. Causas comuns:
 
-| Secret | Valor |
-| --- | --- |
-| `MIGRATE_SSH_KEY` | conteúdo inteiro do arquivo `migrate_key` (privada) |
-| `MIGRATE_SSH_USER` | `migrate` |
-| `MIGRATE_PSQL_CMD` | opcional. Só se **não** usar `command=` no `authorized_keys` e o container não for `supabase-db` |
-
-O `VPS_HOST` já existe e é reaproveitado.
-
-Na primeira execução, a migration inicial (`20260107051405_…`) é só marcada
-como aplicada, porque o banco de produção já tem esse schema. As seguintes
-são executadas.
+- **Saiu com 1 sem saída:** o shell do usuário é `/bin/false`/`nologin` (o sshd roda o `command=` através do shell), ou a chave está em outro usuário.
+- **Saiu com 0 sem saída:** falta o `-i` em `docker exec -i`, então o SQL não chega ao `psql`.
+- **`Permission denied (publickey)`:** a chave não está no `authorized_keys` do usuário do secret `MIGRATE_SSH_USER`.
 
 ## Criando uma nova migration
 
