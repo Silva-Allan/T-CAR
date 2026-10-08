@@ -17,15 +17,17 @@ A cada push na `main`, o GitHub Actions aplica as migrations pendentes de
   | Chave (comentário) | Só consegue... |
   | --- | --- |
   | `github-actions-deploy-tcar` | `rrsync` para `/home/deploy/frontend-dist` (publicar o site) |
-  | `migrate-github-actions` | `docker exec -i supabase-db psql -U postgres -d postgres -X -q` |
+  | `migrate-github-actions` | `docker exec -i supabase-db psql -U supabase_admin -d postgres -X -q` |
 
   Linha da chave de migrations:
 
   ```
-  command="docker exec -i supabase-db psql -U postgres -d postgres -X -q",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... migrate-github-actions
+  command="docker exec -i supabase-db psql -U supabase_admin -d postgres -X -q",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty ssh-ed25519 AAAA... migrate-github-actions
   ```
 
   Qualquer comando enviado com essa chave é ignorado: ela só abre o `psql`, que lê o SQL do stdin. Não dá shell.
+
+  As migrations rodam como **`supabase_admin`**, porque é o dono de todas as tabelas e funções do schema (criadas pelo Studio). O papel `postgres` não é superusuário no Supabase self-hosted e não consegue alterar objetos de outro dono: falha com `must be owner of ...`.
 
 - **Secrets no GitHub** (Settings → Secrets and variables → Actions):
 

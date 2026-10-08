@@ -3,7 +3,7 @@
 # T-CAR — Aplica as migrations pendentes de supabase/migrations/
 # ======================================================================
 # Todo SQL vai pelo stdin do comando em $PSQL_REMOTE, por exemplo:
-#   ssh migrate@host 'docker exec -i supabase-db psql -U postgres -d postgres -X -q'
+#   ssh deploy@host 'docker exec -i supabase-db psql -U supabase_admin -d postgres -X -q'
 # Assim nada precisa ser instalado no servidor, e funciona mesmo com uma
 # chave SSH restrita a um único comando (command="..." no authorized_keys).
 #

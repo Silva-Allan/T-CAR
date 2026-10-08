@@ -49,7 +49,7 @@ jobs:
 
           # Comando remoto que lê SQL do stdin. Se a chave tiver command="..."
           # no authorized_keys, o servidor ignora este e usa o dele.
-          PSQL_CMD="${MIGRATE_PSQL_CMD:-docker exec -i supabase-db psql -U postgres -d postgres}"
+          PSQL_CMD="${MIGRATE_PSQL_CMD:-docker exec -i supabase-db psql -U supabase_admin -d postgres}"
           export PSQL_REMOTE="ssh -i ~/.ssh/migrate_key -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15 $MIGRATE_SSH_USER@$VPS_HOST '$PSQL_CMD -X -q'"
           bash scripts/migrate.sh
 
