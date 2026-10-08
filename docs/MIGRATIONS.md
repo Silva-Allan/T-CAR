@@ -21,8 +21,13 @@ Isso gera `migrate_key` (privada, vai para o GitHub) e `migrate_key.pub` (públi
 
 ### 2. Criar o usuário restrito na VPS
 
+> O usuário **precisa ter um shell real** (`/bin/bash`), não `/usr/sbin/nologin`
+> nem `/bin/false`. O sshd executa o `command="..."` através do shell do usuário,
+> e com `nologin`/`false` o comando nunca roda. A restrição de acesso vem do
+> `command=` + `no-pty`, não do shell.
+
 ```bash
-sudo adduser --disabled-password --gecos "" migrate
+sudo adduser --disabled-password --gecos "" --shell /bin/bash migrate
 sudo usermod -aG docker migrate        # só se o Postgres roda em Docker
 sudo mkdir -p /home/migrate/.ssh
 sudo chmod 700 /home/migrate/.ssh

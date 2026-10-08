@@ -43,6 +43,24 @@ for f in "${files[@]}"; do
   fi
 done
 
+# 0. Testa o acesso antes de tudo, mostrando a saída completa se falhar
+if ! preflight=$(echo "select 'tcar-migrate-ok' as status;" | psql_remote 2>&1) || ! grep -q 'tcar-migrate-ok' <<<"$preflight"; then
+  echo "::error::Não foi possível executar o psql no servidor via SSH."
+  echo "----- saída do servidor -----"
+  echo "${preflight:-(nenhuma saída)}"
+  echo "-----------------------------"
+  cat <<'EOF'
+Causas mais comuns (ver docs/MIGRATIONS.md):
+  - Usuário criado com shell /usr/sbin/nologin ou /bin/false: o sshd roda o
+    command="..." através desse shell, então ele nunca executa.
+    Corrija com: sudo usermod -s /bin/bash migrate
+  - Sem permissão no Docker: sudo usermod -aG docker migrate
+  - Nome do container errado (confira com: docker ps)
+  - Chave pública ausente/errada em /home/migrate/.ssh/authorized_keys
+EOF
+  exit 1
+fi
+
 version_of() { basename "$1" | cut -d_ -f1; }
 name_of() { basename "$1" .sql | cut -d_ -f2-; }
 
