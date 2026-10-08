@@ -13,6 +13,11 @@ type AthleteRow = Tables<'athletes'>;
 type TestRow = Tables<'tests'>;
 type TestResultRow = Tables<'test_results'>;
 type ProfileRow = Tables<'profiles'>;
+type EvaluationRow = Tables<'evaluations'>;
+
+export type EvaluationWithTests = EvaluationRow & {
+  evaluation_tests: { test_id: string; tests: { date: string; protocol_level: number } | null }[];
+};
 
 type AthleteInsert = TablesInsert<'athletes'>;
 type TestInsert = TablesInsert<'tests'>;
@@ -261,6 +266,26 @@ class SupabaseServiceClass {
     return data || [];
   }
 
+  /** Testes num intervalo [startISO, endISO) — usado pelo filtro de dia do Histórico */
+  async getTestsInRange(startISO: string, endISO: string): Promise<any[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('tests')
+      .select('*, test_results(*)')
+      .eq('user_id', user.id)
+      .gte('date', startISO)
+      .lt('date', endISO)
+      .order('date', { ascending: false });
+
+    if (error) {
+      Logger.error('Erro ao buscar testes do período:', error?.message);
+      return [];
+    }
+    return data || [];
+  }
+
   async getTestWithResults(testId: string): Promise<{
     test: TestRow;
     results: TestResultRow[];
@@ -299,6 +324,129 @@ class SupabaseServiceClass {
 
     if (error) {
       Logger.error('Erro ao deletar teste:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Busca testes + resultados + dados do atleta (equipe, nascimento, posição)
+   * para o relatório unificado. Lança erro em falha para a tela exibir.
+   */
+  async getTestsForReport(testIds: string[]): Promise<any[]> {
+    if (testIds.length === 0) return [];
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('AUTH_ERROR');
+
+    const { data, error } = await supabase
+      .from('tests')
+      .select('*, test_results(*, athletes(team, birth_date, position))')
+      .in('id', testIds)
+      .eq('user_id', user.id);
+
+    if (error) {
+      Logger.error('Erro ao buscar testes do relatório:', error.message);
+      throw error;
+    }
+    return data || [];
+  }
+
+  // ====================================================================
+  // AVALIAÇÕES (agrupamento nomeado de baterias)
+  // ====================================================================
+
+  async getEvaluations(): Promise<EvaluationWithTests[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data, error } = await supabase
+      .from('evaluations')
+      .select('*, evaluation_tests(test_id, tests(date, protocol_level))')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      Logger.error('Erro ao buscar avaliações:', error.message);
+      throw error;
+    }
+    return (data || []) as unknown as EvaluationWithTests[];
+  }
+
+  async getEvaluationsByIds(ids: string[]): Promise<EvaluationWithTests[]> {
+    if (ids.length === 0) return [];
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('AUTH_ERROR');
+
+    const { data, error } = await supabase
+      .from('evaluations')
+      .select('*, evaluation_tests(test_id, tests(date, protocol_level))')
+      .in('id', ids)
+      .eq('user_id', user.id);
+
+    if (error) {
+      Logger.error('Erro ao buscar avaliações:', error.message);
+      throw error;
+    }
+    return (data || []) as unknown as EvaluationWithTests[];
+  }
+
+  async createEvaluation(name: string, notes: string | null, testIds: string[]): Promise<EvaluationRow> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('AUTH_ERROR');
+
+    const { data: evaluation, error } = await supabase
+      .from('evaluations')
+      .insert({ name, notes, user_id: user.id })
+      .select()
+      .single();
+
+    if (error || !evaluation) {
+      Logger.error('Erro ao criar avaliação:', error?.message);
+      throw error;
+    }
+
+    const { error: linkError } = await supabase
+      .from('evaluation_tests')
+      .insert(testIds.map(test_id => ({ evaluation_id: evaluation.id, test_id })));
+
+    if (linkError) {
+      Logger.error('Erro ao vincular baterias à avaliação:', linkError.message);
+      // Rollback: não deixa avaliação vazia para trás
+      await supabase.from('evaluations').delete().eq('id', evaluation.id);
+      throw linkError;
+    }
+
+    return evaluation;
+  }
+
+  async updateEvaluation(id: string, updates: { name?: string; notes?: string | null }): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('AUTH_ERROR');
+
+    const { error } = await supabase
+      .from('evaluations')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      Logger.error('Erro ao atualizar avaliação:', error.message);
+      throw error;
+    }
+  }
+
+  /** Exclui só o agrupamento — as baterias continuam no histórico */
+  async deleteEvaluation(id: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('AUTH_ERROR');
+
+    const { error } = await supabase
+      .from('evaluations')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      Logger.error('Erro ao excluir avaliação:', error.message);
       throw error;
     }
   }
@@ -466,6 +614,7 @@ class SupabaseServiceClass {
     const profile = await this.getProfile();
     const athletes = await this.getAthletes();
     const tests = await this.getTests();
+    const evaluations = await this.getEvaluations().catch(() => []);
 
     return {
       export_date: new Date().toISOString(),
@@ -475,7 +624,8 @@ class SupabaseServiceClass {
         profile
       },
       athletes,
-      tests
+      tests,
+      evaluations
     };
   }
 
@@ -499,6 +649,7 @@ class SupabaseServiceClass {
       await supabase.from('test_results').delete().in('test_id', testIds);
     }
 
+    await supabase.from('evaluations').delete().eq('user_id', user.id);
     await supabase.from('athletes').delete().eq('user_id', user.id);
     await supabase.from('tests').delete().eq('user_id', user.id);
     await supabase.from('profiles').delete().eq('id', user.id);

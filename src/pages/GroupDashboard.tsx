@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Users, Trophy, TrendingUp, Loader2, Download, FileText,
+    Users, Trophy, TrendingUp, Loader2, FileSpreadsheet, FileText,
     ChevronRight, BarChart3
 } from 'lucide-react';
 import { Logger } from '@/utils/Logger';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { SupabaseService } from '@/services/SupabaseService';
 import { ClassificationService } from '@/services/ClassificationService';
 import { ExportService } from '@/services/ExportService';
+import { ExcelExportService } from '@/services/ExcelExportService';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import {
@@ -99,15 +100,19 @@ export default function GroupDashboard() {
         }
     };
 
-    const handleExportCSV = () => {
-        const csvRanking = ranking.map((r, i) => ({
-            position: i + 1,
-            athleteName: r.athleteName,
-            avgPV: r.avgPV,
-            testCount: r.testCount,
-        }));
-        const csv = ExportService.exportGroupRankingToCSV(csvRanking, t, lang);
-        ExportService.downloadCSV(csv, `tcar_ranking_${new Date().toISOString().split('T')[0]}.csv`);
+    const handleExportExcel = async () => {
+        try {
+            const excelRanking = ranking.map((r, i) => ({
+                position: i + 1,
+                athleteName: r.athleteName,
+                avgPV: r.avgPV,
+                lastPV: r.lastPV,
+                testCount: r.testCount,
+            }));
+            await ExcelExportService.exportGroupRanking(excelRanking, t, `tcar_ranking_${new Date().toISOString().split('T')[0]}.xlsx`);
+        } catch (error) {
+            Logger.error('Error exporting Excel:', error);
+        }
     };
 
     if (loading) {
@@ -189,9 +194,9 @@ export default function GroupDashboard() {
                         </h3>
                         {ranking.length > 0 && (
                             <div className="flex gap-2">
-                                <Button variant="ghost" size="sm" onClick={handleExportCSV}>
-                                    <Download className="w-4 h-4 mr-1" />
-                                    CSV
+                                <Button variant="ghost" size="sm" onClick={handleExportExcel}>
+                                    <FileSpreadsheet className="w-4 h-4 mr-1" />
+                                    Excel
                                 </Button>
                                 <Button variant="ghost" size="sm" onClick={handleExportPDF} disabled={exporting}>
                                     <FileText className="w-4 h-4 mr-1" />

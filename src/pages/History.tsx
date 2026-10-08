@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileDown, Trash2, Calendar, Gauge, Clock, ChevronDown, ChevronUp, Users, ExternalLink, Loader2 } from 'lucide-react';
+import { Trash2, Calendar, Gauge, Clock, ChevronDown, ChevronUp, Users, ExternalLink, Loader2, Layers, Check, X, CheckSquare } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,14 +51,20 @@ export default function History() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState('');
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) {
       navigate('/auth');
       return;
     }
-    loadTests(0, true);
-  }, [user, navigate]);
+    if (dateFilter) {
+      loadDay(dateFilter);
+    } else {
+      loadTests(0, true);
+    }
+  }, [user, navigate, dateFilter]);
 
   const loadTests = async (pageToLoad: number, isInitial = false) => {
     if (isInitial) setLoading(true);
@@ -83,6 +89,24 @@ export default function History() {
     }
   };
 
+  // Busca o dia inteiro no servidor (dia LOCAL — `date` é timestamptz),
+  // para "selecionar todas do dia" não depender das páginas já carregadas
+  const loadDay = async (day: string) => {
+    setLoading(true);
+    try {
+      const [y, m, d] = day.split('-').map(Number);
+      const start = new Date(y, m - 1, d);
+      const end = new Date(y, m - 1, d + 1);
+      const data = await SupabaseService.getTestsInRange(start.toISOString(), end.toISOString());
+      setTests(data as unknown as TestWithResults[]);
+      setHasMore(false);
+    } catch (error) {
+      Logger.error('Error loading tests for day:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLoadMore = () => {
     if (!loadingMore && hasMore) {
       loadTests(page + 1);
@@ -94,34 +118,35 @@ export default function History() {
     try {
       await SupabaseService.deleteTest(deleteId);
       setTests(tests.filter(t => t.id !== deleteId));
+      setSelected(prev => prev.filter(id => id !== deleteId));
       setDeleteId(null);
     } catch (error) {
       Logger.error('Error deleting test:', error);
     }
   };
 
-  const handleExportCSV = () => {
-    const headers = [t('testDate'), t('athleteLabel'), t('protocol'), t('pvCorrigidoLabel'), t('stagesLabel'), t('distanceLabel'), 'FC'];
+  const toggleSelected = (id: string) => {
+    setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+  };
 
-    const rows = tests.flatMap(test =>
-      test.test_results.map(result => [
-        new Date(test.date.includes('T') ? test.date : `${test.date}T12:00:00`).toLocaleDateString(t('dateLocale')),
-        result.athlete_name,
-        `${t('level')} ${test.protocol_level}`,
-        Number(result.pv_corrigido).toFixed(1),
-        result.completed_stages.toString(),
-        `${result.final_distance}m`,
-        result.fc_final?.toString() || (result.fc_estimada ? `~${result.fc_estimada}` : '-')
-      ])
-    );
+  const exitSelection = () => {
+    setSelecting(false);
+    setSelected([]);
+  };
 
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `tcar_resultados_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+  const allVisibleSelected = tests.length > 0 && tests.every(test => selected.includes(test.id));
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = tests.map(test => test.id);
+    setSelected(prev => (
+      allVisibleSelected
+        ? prev.filter(id => !visibleIds.includes(id))
+        : Array.from(new Set([...prev, ...visibleIds]))
+    ));
+  };
+
+  const handleMerge = () => {
+    navigate(`/reports/merged?tests=${selected.join(',')}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -153,15 +178,22 @@ export default function History() {
       showBack
       backTo="/"
       action={
-        tests.length > 0 && (
-          <Button size="sm" variant="outline" onClick={handleExportCSV}>
-            <FileDown className="w-4 h-4 mr-1" />
-            CSV
+        selecting ? (
+          <Button size="sm" variant="ghost" onClick={exitSelection}>
+            <X className="w-4 h-4 mr-1" />
+            {t('cancel')}
           </Button>
+        ) : (
+          tests.length > 0 && (
+            <Button size="sm" variant="outline" onClick={() => setSelecting(true)}>
+              <Layers className="w-4 h-4 mr-1" />
+              {t('mergeAction')}
+            </Button>
+          )
         )
       }
     >
-      <div className="max-w-md mx-auto">
+      <div className={cn('max-w-md mx-auto', selecting && 'pb-24')}>
         {/* Search Bar */}
         <div className="mb-4 relative">
           <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -174,6 +206,18 @@ export default function History() {
           />
         </div>
 
+        {selecting && tests.length > 0 && (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">{t('mergeSelectHint')}</p>
+            <Button size="sm" variant="ghost" onClick={toggleSelectAllVisible} className="shrink-0">
+              <CheckSquare className="w-4 h-4 mr-1" />
+              {allVisibleSelected
+                ? t('mergeUnselectAll')
+                : (dateFilter ? t('mergeSelectDay') : t('mergeSelectAll'))}
+            </Button>
+          </div>
+        )}
+
         {tests.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-full bg-secondary mx-auto mb-4 flex items-center justify-center">
@@ -183,42 +227,60 @@ export default function History() {
           </div>
         ) : (
           <div className="space-y-3">
-            {tests
-              .filter(test => !dateFilter || test.date.startsWith(dateFilter))
-              .map((test, index) => (
+            {tests.map((test, index) => {
+              const isSelected = selected.includes(test.id);
+              return (
                 <div
                   key={test.id}
-                  className="glass-card rounded-xl animate-fade-in overflow-hidden"
+                  className={cn(
+                    "glass-card rounded-xl animate-fade-in overflow-hidden",
+                    isSelected && "ring-2 ring-primary"
+                  )}
                   style={{ animationDelay: `${index * 50}ms` }}
+                  onClick={selecting ? () => toggleSelected(test.id) : undefined}
+                  role={selecting ? 'checkbox' : undefined}
+                  aria-checked={selecting ? isSelected : undefined}
                 >
                   {/* Card Header */}
-                  <div className="p-4">
+                  <div className={cn("p-4", selecting && "cursor-pointer")}>
                     <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="font-semibold flex items-center gap-2">
-                          <Users className="w-4 h-4 text-primary" />
-                          {test.test_results.length} {test.test_results.length === 1 ? t('athleteSingular') : t('athletesPlural')}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(test.date)}
-                        </p>
+                      <div className="flex items-start gap-3">
+                        {selecting && (
+                          <span className={cn(
+                            'mt-0.5 w-5 h-5 shrink-0 rounded border flex items-center justify-center',
+                            isSelected ? 'bg-primary border-primary text-primary-foreground' : 'border-muted-foreground/40'
+                          )}>
+                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                          </span>
+                        )}
+                        <div>
+                          <p className="font-semibold flex items-center gap-2">
+                            <Users className="w-4 h-4 text-primary" />
+                            {test.test_results.length} {test.test_results.length === 1 ? t('athleteSingular') : t('athletesPlural')}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatDate(test.date)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => navigate(`/test/${test.id}`)}
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => setDeleteId(test.id)}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
-                      </div>
+                      {!selecting && (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => navigate(`/test/${test.id}`)}
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setDeleteId(test.id)}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Athletes preview */}
@@ -251,20 +313,22 @@ export default function History() {
                     </div>
 
                     {/* Expand button */}
-                    <button
-                      className="w-full mt-3 pt-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => setExpandedId(expandedId === test.id ? null : test.id)}
-                    >
-                      {expandedId === test.id ? (
-                        <>{t('collapse')} <ChevronUp className="w-4 h-4" /></>
-                      ) : (
-                        <>{t('viewResults')} <ChevronDown className="w-4 h-4" /></>
-                      )}
-                    </button>
+                    {!selecting && (
+                      <button
+                        className="w-full mt-3 pt-3 border-t border-border/50 flex items-center justify-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        onClick={() => setExpandedId(expandedId === test.id ? null : test.id)}
+                      >
+                        {expandedId === test.id ? (
+                          <>{t('collapse')} <ChevronUp className="w-4 h-4" /></>
+                        ) : (
+                          <>{t('viewResults')} <ChevronDown className="w-4 h-4" /></>
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   {/* Expanded content */}
-                  {expandedId === test.id && (
+                  {!selecting && expandedId === test.id && (
                     <div className="border-t border-border/50 p-4 bg-secondary/30 space-y-2">
                       {test.test_results
                         .sort((a, b) => Number(b.pv_corrigido) - Number(a.pv_corrigido))
@@ -300,7 +364,8 @@ export default function History() {
                     </div>
                   )}
                 </div>
-              ))}
+              );
+            })}
 
             {/* Load More Button */}
             {hasMore && tests.length > 0 && (
@@ -324,6 +389,18 @@ export default function History() {
           </div>
         )}
       </div>
+
+      {/* Barra de unificação */}
+      {selecting && (
+        <div className="fixed bottom-0 inset-x-0 z-40 p-4 bg-card/95 backdrop-blur-md border-t border-border/60">
+          <div className="max-w-md mx-auto">
+            <Button className="w-full" disabled={selected.length < 2} onClick={handleMerge}>
+              <Layers className="w-4 h-4 mr-2" />
+              {t('mergeCount', selected.length)}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

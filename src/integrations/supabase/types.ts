@@ -195,6 +195,63 @@ export type Database = {
           },
         ]
       }
+      evaluations: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      evaluation_tests: {
+        Row: {
+          evaluation_id: string
+          test_id: string
+        }
+        Insert: {
+          evaluation_id: string
+          test_id: string
+        }
+        Update: {
+          evaluation_id?: string
+          test_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_tests_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_tests_test_id_fkey"
+            columns: ["test_id"]
+            isOneToOne: false
+            referencedRelation: "tests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

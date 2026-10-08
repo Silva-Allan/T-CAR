@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Clock, Gauge, Trophy, Ruler, Heart, Calendar, Loader2, FileText } from 'lucide-react';
+import { Clock, Gauge, Trophy, Ruler, Heart, Calendar, Loader2, FileText, FileSpreadsheet } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/test/StatCard';
 import { CalculatorService } from '@/services/CalculatorService';
 import { SupabaseService } from '@/services/SupabaseService';
 import { ExportService } from '@/services/ExportService';
+import { ExcelExportService } from '@/services/ExcelExportService';
+import { MergeService } from '@/services/MergeService';
 import { ClassificationService } from '@/services/ClassificationService';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -42,6 +44,7 @@ export default function TestDetails() {
   const [loading, setLoading] = useState(true);
   const [trainerProfile, setTrainerProfile] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -120,6 +123,27 @@ export default function TestDetails() {
     }
   };
 
+  const handleExportExcel = async () => {
+    if (!test) return;
+    setExportingExcel(true);
+    try {
+      // Busca de novo com os dados do atleta (equipe, categoria, posição)
+      const rows = await SupabaseService.getTestsForReport([test.id]);
+      const reportTest = MergeService.fromSupabase(rows[0]);
+      const report = MergeService.merge([reportTest], [{ key: reportTest.day, label: formatDay(reportTest.day), testIds: [reportTest.id] }]);
+      await ExcelExportService.exportReport(report, t, `tcar_teste_${reportTest.day}.xlsx`);
+    } catch (error) {
+      Logger.error('Erro ao exportar Excel:', error);
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
+  const formatDay = (day: string) => {
+    const locale = (lang as string) === 'en' ? 'en-US' : (lang as string) === 'es' ? 'es-ES' : 'pt-BR';
+    return new Date(`${day}T12:00:00`).toLocaleDateString(locale);
+  };
+
   if (loading) {
     return (
       <PageContainer title={t('testDetailsTitle')} showBack backTo="/history">
@@ -156,7 +180,17 @@ export default function TestDetails() {
             <Calendar className="w-4 h-4" />
             {formatDate(test.date)}
           </p>
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4 flex justify-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportExcel}
+              disabled={exportingExcel}
+              className="gap-2"
+            >
+              {exportingExcel ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+              {t('exportExcel')}
+            </Button>
             <Button
               variant="outline"
               size="sm"

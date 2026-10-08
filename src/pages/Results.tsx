@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Check,
-  Download,
   History as HistoryIcon,
   RotateCcw,
   Share2,
@@ -14,7 +13,7 @@ import {
   Minus,
   Heart,
   Activity,
-  Trophy, Home, Save, Loader2, FileText, ChevronUp, BarChart3, Thermometer
+  Trophy, Home, Save, Loader2, FileText, FileSpreadsheet, ChevronUp, BarChart3, Thermometer
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
@@ -24,6 +23,8 @@ import { CalculatorService } from '@/services/CalculatorService';
 import { SupabaseService } from '@/services/SupabaseService';
 import { SyncService } from '@/services/SyncService';
 import { ExportService } from '@/services/ExportService';
+import { ExcelExportService } from '@/services/ExcelExportService';
+import { MergeService } from '@/services/MergeService';
 import { ClassificationService } from '@/services/ClassificationService';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/store/AppContext';
@@ -259,16 +260,26 @@ export default function Results() {
     }
   };
 
-  const handleExportCSV = () => {
-    const csv = ExportService.exportTestResultsToCSV(
-      multiResult.protocol.level,
-      multiResult.totalTime,
-      new Date().toISOString(),
-      enrichedResults,
-      t,
-      lang
-    );
-    ExportService.downloadCSV(csv, `tcar_teste_${new Date().toISOString().split('T')[0]}.csv`);
+  const handleExportExcel = async () => {
+    try {
+      const reportTest = MergeService.fromAthleteResults(
+        {
+          id: multiResult.id || 'current',
+          date: multiResult.completedAt || new Date().toISOString(),
+          protocolLevel: multiResult.protocol.level,
+          totalTime: Math.round(multiResult.totalTime),
+          temperature: temperature ? parseFloat(temperature) : null,
+        },
+        enrichedResults,
+        selectedAthletes
+      );
+      const locale = lang === 'en' ? 'en-US' : (lang as string) === 'es' ? 'es-ES' : 'pt-BR';
+      const label = new Date(`${reportTest.day}T12:00:00`).toLocaleDateString(locale);
+      const report = MergeService.merge([reportTest], [{ key: reportTest.day, label, testIds: [reportTest.id] }]);
+      await ExcelExportService.exportReport(report, t, `tcar_teste_${reportTest.day}.xlsx`);
+    } catch (error) {
+      toast({ variant: 'destructive', title: t('excelExportError') });
+    }
   };
 
   const handleExportPDF = async () => {
@@ -509,9 +520,9 @@ export default function Results() {
         {/* Export buttons */}
         {saved && (
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={handleExportCSV}>
-              <Download className="w-4 h-4 mr-2" />
-              CSV
+            <Button variant="outline" className="flex-1" onClick={handleExportExcel}>
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Excel
             </Button>
             <Button variant="outline" className="flex-1" onClick={handleExportPDF}>
               <FileText className="w-4 h-4 mr-2" />

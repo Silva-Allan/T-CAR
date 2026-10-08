@@ -6,6 +6,7 @@
 // ======================================================================
 
 import { AthleteResult } from '@/models/types';
+import type { MergedReport } from '@/services/MergeService';
 import { Logger } from '@/utils/Logger';
 
 // Cores UDESC (mantidas)
@@ -717,75 +718,177 @@ class ExportServiceClass {
         }
     }
 
-    // ====================================================================
-    // CSV Export (mantido para compatibilidade)
-    // ====================================================================
-
-    exportTestResultsToCSV(
-        protocolLevel: number,
-        totalTime: number,
-        date: string,
-        athleteResults: AthleteResult[],
+    /**
+     * Relatório unificado: várias baterias/avaliações em um único PDF.
+     * Ranking geral por nível + comparativo entre avaliações (quando houver).
+     */
+    async exportMergedReportToPDF(
+        report: MergedReport,
         t: any,
-        lang: string
-    ): string {
-        const headers = [
-            t('athlete'), t('reportStages'), t('repsLabel'), t('totalReps'),
-            `${t('pvBruto')} (km/h)`, `${t('pvCorr')} (km/h)`, `${t('fcFinal')} (bpm)`,
-            `${t('estimatedHR')} (bpm)`, `${t('distance')} (m)`, t('status'),
-        ];
-        const rows = athleteResults.map(ar => [
-            this.csvField(ar.athleteName), ar.completedStages, ar.completedRepsInLastStage,
-            ar.totalReps, ar.pvBruto.toFixed(1), ar.pvCorrigido.toFixed(1),
-            ar.fcFinal ?? '', ar.fcEstimada ?? '', ar.finalDistance,
-            ar.eliminatedByFailure ? t('yes') : t('no'),
-        ]);
-        const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
-        const metaRows = [
-            [`T-CAR - ${t('reportTest')}`],
-            [`${t('testDate')} ${new Date(date).toLocaleDateString(locale)}`],
-            [`${t('protocolLabel')}: ${t('level')} ${protocolLevel}`],
-            [`${t('totalTime')}: ${this.formatTime(totalTime)}`],
-            [`${t('athletesLabel')} ${athleteResults.length}`],
-            [],
-        ];
-        return [
-            ...metaRows.map(r => r.join(',')),
-            headers.join(','),
-            ...rows.map(r => r.join(',')),
-        ].join('\n');
+        lang: string,
+        options: { title?: string | null; team?: string | null; fileName: string }
+    ): Promise<void> {
+        try {
+            const { default: jsPDF } = await import('jspdf');
+            const doc = new jsPDF();
+            const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
+            const fmtDay = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString(locale);
+            const multiGroup = report.groups.length > 1;
+
+            let y = this.drawEnhancedHeader(
+                doc,
+                t('mergedReportTitle'),
+                lang,
+                options.title ?? undefined,
+                options.team ?? undefined
+            );
+
+            const period = report.period
+                ? (report.period.start === report.period.end
+                    ? fmtDay(report.period.start)
+                    : `${fmtDay(report.period.start)} - ${fmtDay(report.period.end)}`)
+                : '-';
+            const levels = report.sections.map(s => s.level).join(', ');
+
+            y = this.drawModernInfoBox(doc, y, [
+                { label: t('period'), value: period },
+                { label: t('mergedEvaluationsLabel'), value: `${report.groups.length}` },
+                { label: t('mergedBatteriesLabel') + ':', value: `${report.stats.batteries}` },
+                { label: t('athletesLabel'), value: `${report.stats.athletes}` },
+                { label: t('protocolLabel') + ':', value: `${t('level')} ${levels}` },
+            ], 3);
+
+            y = this.drawMetricCard(doc, y, [
+                { label: t('bestPV'), value: report.stats.bestPV.toFixed(1), color: UDESC_GREEN },
+                { label: t('avgPV'), value: report.stats.avgPV.toFixed(1), color: UDESC_GREEN },
+                { label: t('worstPV'), value: report.stats.worstPV.toFixed(1), color: ACCENT_RED },
+                { label: t('totalAthletes'), value: `${report.stats.athletes}`, color: UDESC_GREEN },
+            ]);
+
+            // Legenda das avaliações (A1, A2...) usada nas tabelas
+            if (multiGroup) {
+                y = this.ensureSpace(doc, y, 12 + report.groups.length * 5);
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...UDESC_GREEN);
+                doc.text(t('mergedEvaluationsLegend'), 15, y);
+                y += 5;
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...TEXT_SECONDARY);
+                report.groups.forEach((g, i) => {
+                    const batteries = `${g.batteryCount} ${t('mergedBatteriesShort')}`;
+                    doc.text(`A${i + 1} = ${g.label.substring(0, 60)}  (${batteries}, ${g.athleteCount} ${t('athletesPlural')})`, 15, y);
+                    y += 5;
+                });
+                y += 5;
+            }
+
+            let hasRepeated = false;
+
+            // Ranking por nível
+            for (const section of report.sections) {
+                y = this.ensureSpace(doc, y + 4, 45);
+                const sectionTitle = report.mixedLevels
+                    ? `${t('mergedRanking')} - ${t('level')} ${section.level}`
+                    : t('mergedRanking');
+                y = this.drawSectionTitleModern(doc, y, sectionTitle);
+
+                const headers = ['#', t('athlete'), t('team'), t('mergedCategoryShort'), t('pvCorr'), t('pvBruto'), t('fcLabel'), multiGroup ? t('mergedEvalBattery') : t('mergedBatteryShort'), t('status')];
+                const colWidths = [8, 40, 30, 18, 18, 18, 14, 20, 14];
+
+                const rows = section.ranking.map(entry => {
+                    const r = entry.row;
+                    if (entry.repeated) hasRepeated = true;
+                    const fc = r.fcFinal != null ? `${r.fcFinal}` : (r.fcEstimada != null ? `~${r.fcEstimada}` : '-');
+                    return [
+                        `${entry.position}`,
+                        r.athleteName.substring(0, 20),
+                        (r.team || '-').substring(0, 15),
+                        r.category || '-',
+                        `${r.pvCorrigido.toFixed(1)}${entry.repeated ? '*' : ''}`,
+                        r.pvBruto.toFixed(1),
+                        fc,
+                        multiGroup ? `A${r.groupIndex + 1} / B${r.batteryNumber}` : `B${r.batteryNumber}`,
+                        r.eliminatedByFailure ? t('statusEliminated') : t('statusOK'),
+                    ];
+                });
+
+                y = this.drawEnhancedTable(doc, y, headers, colWidths, rows, { highlightFirst: true });
+            }
+
+            if (hasRepeated) {
+                y = this.ensureSpace(doc, y, 8);
+                doc.setFontSize(7);
+                doc.setFont('helvetica', 'italic');
+                doc.setTextColor(...TEXT_SECONDARY);
+                doc.text(`* ${t('mergedRepeatedNote')}`, 15, y);
+                y += 8;
+            }
+
+            // Comparativo entre avaliações
+            if (multiGroup) {
+                // A página comporta ~5 avaliações; o Excel traz o histórico completo
+                const MAX_GROUPS = 5;
+                const firstShown = Math.max(0, report.groups.length - MAX_GROUPS);
+                const shownCount = report.groups.length - firstShown;
+
+                for (const section of report.sections) {
+                    if (!section.comparison.length) continue;
+                    y = this.ensureSpace(doc, y + 8, 45);
+                    const sectionTitle = report.mixedLevels
+                        ? `${t('mergedComparison')} - ${t('level')} ${section.level}`
+                        : t('mergedComparison');
+                    y = this.drawSectionTitleModern(doc, y, sectionTitle);
+
+                    const nameW = 52;
+                    const evoW = 22;
+                    const groupW = (180 - nameW - evoW) / shownCount;
+                    const headers = [
+                        t('athlete'),
+                        ...Array.from({ length: shownCount }, (_, i) => `A${firstShown + i + 1}`),
+                        t('evolution').replace(':', ''),
+                    ];
+                    const colWidths = [nameW, ...Array(shownCount).fill(groupW), evoW];
+
+                    const rows = section.comparison.map(c => [
+                        c.athleteName.substring(0, 26),
+                        ...c.values.slice(firstShown).map(v => (v != null ? v.toFixed(1) : '-')),
+                        c.evolution != null ? `${c.evolution > 0 ? '+' : ''}${c.evolution.toFixed(1)}` : '-',
+                    ]);
+
+                    y = this.drawEnhancedTable(doc, y, headers, colWidths, rows);
+                }
+
+                if (firstShown > 0) {
+                    y = this.ensureSpace(doc, y, 8);
+                    doc.setFontSize(7);
+                    doc.setFont('helvetica', 'italic');
+                    doc.setTextColor(...TEXT_SECONDARY);
+                    doc.text(t('mergedComparisonTruncated', MAX_GROUPS), 15, y);
+                    y += 8;
+                }
+            }
+
+            this.drawEnhancedFooter(doc, t, lang);
+            doc.save(options.fileName);
+        } catch (error) {
+            Logger.error('Erro ao gerar PDF unificado:', error);
+            throw new Error('Não foi possível gerar o PDF.');
+        }
     }
 
-    exportGroupRankingToCSV(
-        ranking: { position: number; athleteName: string; avgPV: number; testCount: number }[],
-        t: any,
-        lang: string
-    ): string {
-        const headers = [t('position'), t('athlete'), `${t('avgPVLabel')} (km/h)`, t('testCount')];
-        const rows = ranking.map(r => [`#${r.position}`, this.csvField(r.athleteName), r.avgPV.toFixed(1), r.testCount]);
-        const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
-        return [
-            [`T-CAR - ${t('reportGroup')}`].join(','),
-            [`${t('reportDate')} ${new Date().toLocaleDateString(locale)}`].join(','),
-            [`${t('totalAthletes')} ${ranking.length}`].join(','),
-            '',
-            headers.join(','),
-            ...rows.map(r => r.join(',')),
-        ].join('\n');
+    /** Quebra a página se não houver espaço para o próximo bloco */
+    private ensureSpace(doc: any, y: number, needed: number): number {
+        if (y + needed > 265) {
+            doc.addPage();
+            return 30;
+        }
+        return y;
     }
 
     // ====================================================================
     // Utilitários
     // ====================================================================
-
-    downloadCSV(csvContent: string, fileName: string): void {
-        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = fileName;
-        link.click();
-        URL.revokeObjectURL(link.href);
-    }
 
     async captureChartAsImage(chartElement: HTMLElement | null): Promise<string | null> {
         if (!chartElement) return null;
@@ -808,21 +911,6 @@ class ExportServiceClass {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
-
-    /**
-     * Escapa um valor de texto livre para uso seguro em campo CSV.
-     * - Duplica aspas duplas internas (regra padrão do formato CSV).
-     * - Prefixa com apóstrofo valores que começam com =, +, -, @, tab ou CR,
-     *   para neutralizar injeção de fórmula (CSV/Formula Injection) quando
-     *   o arquivo é aberto em Excel/Sheets.
-     */
-    private csvField(value: string): string {
-        let safe = value.replace(/"/g, '""');
-        if (/^[=+\-@\t\r]/.test(safe)) {
-            safe = `'${safe}`;
-        }
-        return `"${safe}"`;
     }
 }
 

@@ -8,6 +8,7 @@ import {
   Info,
   BarChart3,
   Book,
+  Layers,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/store/AppContext';
@@ -112,6 +113,19 @@ export default function Index() {
               onClick={() => navigate('/settings')}
             />
           </div>
+
+          <button
+            onClick={() => navigate('/evaluations')}
+            className="w-full glass-card p-4 flex items-center gap-3 text-left hover:shadow-md transition-all active:scale-[0.99]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-primary/8 flex items-center justify-center">
+              <Layers className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold">{t('evaluationsTitle')}</p>
+              <p className="text-xs text-muted-foreground">{t('evaluationsMenuDesc')}</p>
+            </div>
+          </button>
 
           <button
             onClick={() => navigate('/about')}
