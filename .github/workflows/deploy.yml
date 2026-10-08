@@ -3,6 +3,8 @@ name: Deploy frontend to VPS
 on:
   push:
     branches: [main]
+  # Botão "Run workflow" na aba Actions: roda deploy + migrations sem push
+  workflow_dispatch:
 
 # Dois pushes seguidos não podem migrar o banco ao mesmo tempo
 concurrency:
