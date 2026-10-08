@@ -4,8 +4,55 @@ on:
   push:
     branches: [main]
 
+# Dois pushes seguidos não podem migrar o banco ao mesmo tempo
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Roda ANTES do deploy do frontend: se uma migration falhar, o site
+      # nunca fica com código novo apontando para um banco antigo.
+      - name: Aplicar migrations do banco
+        env:
+          MIGRATE_SSH_KEY: ${{ secrets.MIGRATE_SSH_KEY }}
+          MIGRATE_SSH_USER: ${{ secrets.MIGRATE_SSH_USER }}
+          MIGRATE_PSQL_CMD: ${{ secrets.MIGRATE_PSQL_CMD }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          if [ -z "$MIGRATE_SSH_KEY" ] || [ -z "$MIGRATE_SSH_USER" ]; then
+            echo "::warning::Migrations NÃO aplicadas: configure os secrets MIGRATE_SSH_KEY e MIGRATE_SSH_USER (ver docs/MIGRATIONS.md)."
+            exit 0
+          fi
+
+          mkdir -p ~/.ssh
+          echo "$MIGRATE_SSH_KEY" > ~/.ssh/migrate_key
+          chmod 600 ~/.ssh/migrate_key
+
+          for attempt in 1 2 3 4 5; do
+            if ssh-keyscan -T 15 -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/tmp/keyscan.err && [ -s ~/.ssh/known_hosts ]; then
+              break
+            fi
+            echo "ssh-keyscan falhou (tentativa $attempt/5):"
+            cat /tmp/keyscan.err
+            if [ "$attempt" = 5 ]; then
+              exit 1
+            fi
+            sleep 5
+          done
+
+          # Comando remoto que lê SQL do stdin. Se a chave tiver command="..."
+          # no authorized_keys, o servidor ignora este e usa o dele.
+          PSQL_CMD="${MIGRATE_PSQL_CMD:-docker exec -i supabase-db psql -U postgres -d postgres}"
+          export PSQL_REMOTE="ssh -i ~/.ssh/migrate_key -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=15 $MIGRATE_SSH_USER@$VPS_HOST '$PSQL_CMD -X -q'"
+          bash scripts/migrate.sh
+
   build-and-deploy:
+    needs: migrate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

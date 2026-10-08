@@ -5,7 +5,8 @@
 -- "Pré-temporada Sub-15". Excluir a avaliação NÃO exclui os testes;
 -- excluir um teste o remove automaticamente das avaliações.
 --
--- Rode no Supabase SQL Editor (Dashboard > SQL Editor > New Query).
+-- Aplicada automaticamente pelo deploy (scripts/migrate.sh).
+-- Idempotente: pode ser rodada mais de uma vez sem erro.
 -- ======================================================================
 
 create table if not exists public.evaluations (
@@ -47,15 +48,20 @@ create trigger on_evaluations_updated
 alter table public.evaluations enable row level security;
 alter table public.evaluation_tests enable row level security;
 
+drop policy if exists "Users can view own evaluations" on public.evaluations;
 create policy "Users can view own evaluations" on public.evaluations
   for select using (auth.uid() = user_id);
+drop policy if exists "Users can insert own evaluations" on public.evaluations;
 create policy "Users can insert own evaluations" on public.evaluations
   for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can update own evaluations" on public.evaluations;
 create policy "Users can update own evaluations" on public.evaluations
   for update using (auth.uid() = user_id);
+drop policy if exists "Users can delete own evaluations" on public.evaluations;
 create policy "Users can delete own evaluations" on public.evaluations
   for delete using (auth.uid() = user_id);
 
+drop policy if exists "Users can view own evaluation tests" on public.evaluation_tests;
 create policy "Users can view own evaluation tests" on public.evaluation_tests
   for select using (
     exists (
@@ -65,6 +71,7 @@ create policy "Users can view own evaluation tests" on public.evaluation_tests
     )
   );
 -- Só permite vincular testes do próprio usuário a avaliações do próprio usuário
+drop policy if exists "Users can insert own evaluation tests" on public.evaluation_tests;
 create policy "Users can insert own evaluation tests" on public.evaluation_tests
   for insert with check (
     exists (
@@ -78,6 +85,7 @@ create policy "Users can insert own evaluation tests" on public.evaluation_tests
       and tests.user_id = auth.uid()
     )
   );
+drop policy if exists "Users can delete own evaluation tests" on public.evaluation_tests;
 create policy "Users can delete own evaluation tests" on public.evaluation_tests
   for delete using (
     exists (
@@ -86,3 +94,7 @@ create policy "Users can delete own evaluation tests" on public.evaluation_tests
       and evaluations.user_id = auth.uid()
     )
   );
+
+-- Postgres próprio: tabelas novas nem sempre herdam os grants do Supabase
+grant select, insert, update, delete on public.evaluations to authenticated;
+grant select, insert, delete on public.evaluation_tests to authenticated;
