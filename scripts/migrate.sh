@@ -44,19 +44,28 @@ for f in "${files[@]}"; do
 done
 
 # 0. Testa o acesso antes de tudo, mostrando a saída completa se falhar
-if ! preflight=$(echo "select 'tcar-migrate-ok' as status;" | psql_remote 2>&1) || ! grep -q 'tcar-migrate-ok' <<<"$preflight"; then
-  echo "::error::Não foi possível executar o psql no servidor via SSH."
+preflight_status=0
+preflight=$(echo "select 'tcar-migrate-ok' as status;" | psql_remote 2>&1) || preflight_status=$?
+if ! grep -q 'tcar-migrate-ok' <<<"$preflight"; then
+  echo "::error::Não foi possível executar o psql no servidor via SSH (código de saída: $preflight_status)."
   echo "----- saída do servidor -----"
   echo "${preflight:-(nenhuma saída)}"
   echo "-----------------------------"
+  if [ -z "$preflight" ] && [ "$preflight_status" = 0 ]; then
+    echo "Terminou com sucesso sem imprimir nada: o SQL não chegou ao psql."
+    echo "  -> O command=\"...\" do authorized_keys precisa usar 'docker exec -i' (com -i)."
+  elif [ -z "$preflight" ] && [ "$preflight_status" = 1 ]; then
+    echo "Terminou com erro sem imprimir nada: provavelmente o shell do usuário é /bin/false."
+    echo "  -> sudo usermod -s /bin/bash <usuario>"
+  fi
   cat <<'EOF'
 Causas mais comuns (ver docs/MIGRATIONS.md):
-  - Usuário criado com shell /usr/sbin/nologin ou /bin/false: o sshd roda o
+  - Usuário com shell /usr/sbin/nologin ou /bin/false: o sshd roda o
     command="..." através desse shell, então ele nunca executa.
-    Corrija com: sudo usermod -s /bin/bash migrate
-  - Sem permissão no Docker: sudo usermod -aG docker migrate
+  - command="..." sem o -i em 'docker exec -i' (o SQL não chega ao psql)
+  - Sem permissão no Docker: sudo usermod -aG docker <usuario>
   - Nome do container errado (confira com: docker ps)
-  - Chave pública ausente/errada em /home/migrate/.ssh/authorized_keys
+  - Chave pública ausente/errada no authorized_keys do usuário
 EOF
   exit 1
 fi
