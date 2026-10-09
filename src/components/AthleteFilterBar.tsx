@@ -1,21 +1,23 @@
 // ======================================================================
 // T-CAR 2.0 — Barra de Filtros Reutilizável
 // ======================================================================
-// Filtros por Posição, Categoria e Sexo para listas de atletas.
+// Filtros por Modalidade, Posição, Categoria e Sexo para listas de atletas.
 // Usado em SelectAthletes.tsx e Athletes.tsx.
 // ======================================================================
 
 import { Filter, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { VALID_POSITIONS } from '@/models/types';
+import { HANDBALL_POSITIONS, SPORTS, VALID_POSITIONS, normalizeSport, positionsForSport } from '@/models/types';
 
 export interface AthleteFilters {
+  sport: string;
   position: string;
   category: string;
   gender: string;
 }
 
 export const EMPTY_FILTERS: AthleteFilters = {
+  sport: '',
   position: '',
   category: '',
   gender: '',
@@ -31,11 +33,17 @@ interface AthleteFilterBarProps {
 }
 
 export function AthleteFilterBar({ filters, onChange, t }: AthleteFilterBarProps) {
-  const hasActiveFilters = filters.position || filters.category || filters.gender;
+  const hasActiveFilters = filters.sport || filters.position || filters.category || filters.gender;
 
   const update = (key: keyof AthleteFilters, value: string) => {
-    onChange({ ...filters, [key]: filters[key] === value ? '' : value });
+    const next = { ...filters, [key]: filters[key] === value ? '' : value };
+    // Trocar a modalidade descarta uma posição que não pertence a ela
+    if (key === 'sport' && next.sport && !positionsForSport(next.sport).includes(next.position)) next.position = '';
+    onChange(next);
   };
+
+  // Com modalidade escolhida, só as posições dela; sem, futebol e handebol
+  const positions = filters.sport ? positionsForSport(filters.sport) : [...VALID_POSITIONS, ...HANDBALL_POSITIONS];
 
   const clearAll = () => onChange(EMPTY_FILTERS);
 
@@ -58,11 +66,33 @@ export function AthleteFilterBar({ filters, onChange, t }: AthleteFilterBarProps
         )}
       </div>
 
+      {/* Sport chips */}
+      <div className="space-y-1.5">
+        <p className="text-[10px] text-muted-foreground font-medium px-1">{t('sport')}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {SPORTS.map(sport => (
+            <button
+              key={sport}
+              onClick={() => update('sport', sport)}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border",
+                filters.sport === sport
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-card border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+              )}
+            >
+              {t(`sport_${sport}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Position chips */}
+      {positions.length > 0 && (
       <div className="space-y-1.5">
         <p className="text-[10px] text-muted-foreground font-medium px-1">{t('position')}</p>
         <div className="flex flex-wrap gap-1.5">
-          {VALID_POSITIONS.map(pos => (
+          {positions.map(pos => (
             <button
               key={pos}
               onClick={() => update('position', pos)}
@@ -78,6 +108,7 @@ export function AthleteFilterBar({ filters, onChange, t }: AthleteFilterBarProps
           ))}
         </div>
       </div>
+      )}
 
       {/* Category chips */}
       <div className="space-y-1.5">
@@ -130,12 +161,16 @@ export function AthleteFilterBar({ filters, onChange, t }: AthleteFilterBarProps
  * quanto o Athlete local.
  */
 export function applyAthleteFilters<T extends {
+  sport?: string | null;
   position?: string | null;
   birth_date?: string | null;
   birthDate?: string;
   gender?: string | null;
 }>(athletes: T[], filters: AthleteFilters): T[] {
   return athletes.filter(a => {
+    // Filtro por modalidade (registros antigos sem modalidade são de futebol)
+    if (filters.sport && normalizeSport(a.sport) !== filters.sport) return false;
+
     // Filtro por posição
     if (filters.position && a.position !== filters.position) return false;
 

@@ -339,7 +339,7 @@ class SupabaseServiceClass {
 
     const { data, error } = await supabase
       .from('tests')
-      .select('*, test_results(*, athletes(team, birth_date, position))')
+      .select('*, test_results(*, athletes(team, birth_date, position, sport, gender))')
       .in('id', testIds)
       .eq('user_id', user.id);
 
@@ -510,7 +510,7 @@ class SupabaseServiceClass {
 
       const { data: results, error: resultsError } = await supabase
         .from('test_results')
-        .select('athlete_id, athlete_name, pv_corrigido, test_id, athletes(birth_date, position)')
+        .select('athlete_id, athlete_name, pv_corrigido, test_id, athletes(birth_date, position, sport, gender)')
         .in('test_id', testIds);
 
       if (resultsError || !results) {
@@ -532,6 +532,8 @@ class SupabaseServiceClass {
             athleteName: r.athlete_name,
             birth_date: athleteData?.birth_date,
             position: athleteData?.position,
+            sport: athleteData?.sport,
+            gender: athleteData?.gender,
             totalPV: 0,
             testCount: 0,
             lastPV: 0,
@@ -557,6 +559,8 @@ class SupabaseServiceClass {
         athleteName: s.athleteName,
         birth_date: s.birth_date,
         position: s.position,
+        sport: s.sport,
+        gender: s.gender,
         avgPV: s.totalPV / s.testCount,
         lastPV: s.lastPV,
         testCount: s.testCount,

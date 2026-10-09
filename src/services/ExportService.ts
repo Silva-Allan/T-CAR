@@ -5,8 +5,8 @@
 // Destaque para: T-CAR, nome do atleta, clube/equipe e data do PDF.
 // ======================================================================
 
-import { AthleteResult } from '@/models/types';
-import type { MergedReport } from '@/services/MergeService';
+import type { MergedReport, ReportSection } from '@/services/MergeService';
+import { ordinal } from '@/lib/utils';
 import { Logger } from '@/utils/Logger';
 
 // Cores UDESC (mantidas)
@@ -393,109 +393,12 @@ class ExportServiceClass {
     // PDF Export Methods (Atualizados)
     // ====================================================================
 
-    async exportTestResultsToPDF(
-        protocolLevel: number,
-        totalTime: number,
-        date: string,
-        athleteResults: AthleteResult[],
-        t: any,
-        lang: string,
-        options?: { temperature?: number | null; notes?: string; chartImage?: string | null; team?: string | null }
-    ): Promise<void> {
-        try {
-            const { default: jsPDF } = await import('jspdf');
-            const doc = new jsPDF();
-
-            // Header aprimorado
-            let y = this.drawEnhancedHeader(doc, t('reportTest'), lang, undefined, options?.team ?? undefined);
-
-            const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
-
-            // Info Box moderno
-            const infoItems = [
-                { label: t('reportTestDate'), value: new Date(date.includes('T') ? date : `${date}T12:00:00`).toLocaleDateString(locale) },
-                { label: t('timeLabel'), value: new Date(date.includes('T') ? date : `${date}T12:00:00`).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) },
-                { label: t('protocolLabel'), value: `${t('level')} ${protocolLevel}` },
-                { label: t('totalTime') + ':', value: this.formatTime(totalTime) },
-                { label: t('athletesLabel'), value: `${athleteResults.length}` },
-                { label: t('temperatureLabel'), value: options?.temperature ? `${options.temperature}°C` : 'N/I' },
-            ];
-
-            if (options?.team && !athleteResults.length) {
-                infoItems.push({ label: t('teamLabel'), value: options.team });
-            }
-
-            if (options?.notes) {
-                infoItems.push({ label: t('notesLabel'), value: options.notes.substring(0, 30) + (options.notes.length > 30 ? '...' : '') });
-            }
-
-            y = this.drawModernInfoBox(doc, y, infoItems, 3);
-
-            // Stat Cards aprimorados
-            const pvValues = athleteResults.map(ar => ar.pvCorrigido);
-            const bestPV = pvValues.length > 0 ? Math.max(...pvValues) : 0;
-            const avgPV = pvValues.length > 0 ? pvValues.reduce((a, b) => a + b, 0) / pvValues.length : 0;
-            const worstPV = pvValues.length > 0 ? Math.min(...pvValues) : 0;
-
-            y = this.drawMetricCard(doc, y, [
-                { label: t('bestPV'), value: bestPV.toFixed(1), color: UDESC_GREEN },
-                { label: t('avgPV'), value: avgPV.toFixed(1), color: UDESC_GREEN },
-                { label: t('worstPV'), value: worstPV.toFixed(1), color: ACCENT_RED },
-                { label: t('totalAthletes'), value: `${athleteResults.length}`, color: UDESC_GREEN },
-            ]);
-
-            // Chart
-            if (options?.chartImage) {
-                y = this.drawChartWithFrame(doc, y, options.chartImage, t('pvDistribution'));
-            }
-
-            // Enhanced Table
-            y = this.drawSectionTitleModern(doc, y, t('individualResults'));
-
-            const headers = ['#', t('athlete'), t('pvCorr'), t('pvBruto'), t('fcLabel'), t('reportStages'), t('reportReps'), t('reportDistance'), t('status')];
-            const colWidths = [8, 38, 20, 20, 18, 16, 14, 18, 13];
-
-            const rows = athleteResults
-                .sort((a, b) => b.pvCorrigido - a.pvCorrigido)
-                .map((ar, i) => {
-                    const fc = ar.fcFinal != null ? `${ar.fcFinal}` : (ar.fcEstimada != null ? `~${ar.fcEstimada}` : '-');
-                    const statusSymbol = ar.eliminatedByFailure ? t('statusEliminated') : t('statusOK');
-                    return [
-                        `${i + 1}`,
-                        ar.athleteName.substring(0, 16),
-                        ar.pvCorrigido.toFixed(1),
-                        ar.pvBruto.toFixed(1),
-                        fc,
-                        `${ar.completedStages}`,
-                        `${ar.totalReps}`,
-                        `${ar.finalDistance}`,
-                        statusSymbol,
-                    ];
-                });
-
-            y = this.drawEnhancedTable(doc, y, headers, colWidths, rows, {
-                highlightFirst: true,
-                title: t('rankingByPVCorrigido')
-            });
-
-            // Footer
-            this.drawEnhancedFooter(doc, t, lang);
-
-            const fileName = `tcar_teste_${new Date(date).toISOString().split('T')[0]}.pdf`;
-            doc.save(fileName);
-        } catch (error) {
-            Logger.error('Erro ao gerar PDF:', error);
-            throw new Error('Não foi possível gerar o PDF.');
-        }
-    }
-
     async exportAthleteHistoryToPDF(
         athleteName: string,
         tests: {
             date: string;
             protocolLevel: number;
             pvCorrigido: number;
-            pvBruto?: number;
             fcFinal?: number | null;
             fcEstimada?: number | null;
             totalReps: number;
@@ -609,15 +512,14 @@ class ExportServiceClass {
             // Table
             y = this.drawSectionTitleModern(doc, y, t('testDetailing'));
 
-            const headers = ['#', t('testDate'), t('level'), t('pvCorr'), t('pvBruto'), t('fcLabel'), t('reportStages'), t('reportReps'), t('reportDistance')];
-            const colWidths = [8, 22, 14, 23, 20, 20, 18, 15, 20];
+            const headers = ['#', t('testDate'), t('level'), t('pvCorr'), t('fcLabel'), t('reportStages'), t('reportReps'), t('reportDistance')];
+            const colWidths = [10, 28, 16, 30, 24, 22, 20, 30];
 
             const rows = tests.map((t_item, i) => [
                 `${i + 1}`,
                 new Date(t_item.date).toLocaleDateString(locale),
                 `${t_item.protocolLevel}`,
                 `${t_item.pvCorrigido.toFixed(1)}`,
-                t_item.pvBruto != null ? `${t_item.pvBruto.toFixed(1)}` : '-',
                 t_item.fcFinal != null ? `${t_item.fcFinal}` : (t_item.fcEstimada != null ? `~${t_item.fcEstimada}` : '-'),
                 t_item.completedStages != null ? `${t_item.completedStages}` : '-',
                 `${t_item.totalReps}`,
@@ -719,44 +621,65 @@ class ExportServiceClass {
     }
 
     /**
-     * Relatório unificado: várias baterias/avaliações em um único PDF.
-     * Ranking geral por nível + comparativo entre avaliações (quando houver).
+     * Relatório de resultados em PDF. Serve para uma bateria (kind 'battery')
+     * e para o relatório unificado de várias baterias/avaliações ('merged').
+     * Um ranking por modalidade e nível: a última coluna traz a classificação
+     * da tabela de referência ou, nos grupos sem tabela, a colocação (1º, 2º...).
      */
     async exportMergedReportToPDF(
         report: MergedReport,
         t: any,
         lang: string,
-        options: { title?: string | null; team?: string | null; fileName: string }
+        options: { title?: string | null; team?: string | null; fileName: string; kind?: 'battery' | 'merged' }
     ): Promise<void> {
         try {
             const { default: jsPDF } = await import('jspdf');
             const doc = new jsPDF();
             const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
             const fmtDay = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString(locale);
+            const isBattery = options.kind === 'battery';
             const multiGroup = report.groups.length > 1;
+
+            const sectionTitle = (base: string, section: ReportSection) => [
+                base,
+                report.mixedGroups ? t(`group_${section.group}`) : null,
+                report.mixedLevels ? `${t('level')} ${section.level}` : null,
+            ].filter(Boolean).join(' - ');
 
             let y = this.drawEnhancedHeader(
                 doc,
-                t('mergedReportTitle'),
+                isBattery ? t('reportTest') : t('mergedReportTitle'),
                 lang,
                 options.title ?? undefined,
                 options.team ?? undefined
             );
 
-            const period = report.period
-                ? (report.period.start === report.period.end
-                    ? fmtDay(report.period.start)
-                    : `${fmtDay(report.period.start)} - ${fmtDay(report.period.end)}`)
-                : '-';
-            const levels = report.sections.map(s => s.level).join(', ');
+            const levels = Array.from(new Set(report.sections.map(s => s.level))).join(', ');
 
-            y = this.drawModernInfoBox(doc, y, [
-                { label: t('period'), value: period },
-                { label: t('mergedEvaluationsLabel'), value: `${report.groups.length}` },
-                { label: t('mergedBatteriesLabel') + ':', value: `${report.stats.batteries}` },
-                { label: t('athletesLabel'), value: `${report.stats.athletes}` },
-                { label: t('protocolLabel') + ':', value: `${t('level')} ${levels}` },
-            ], 3);
+            if (isBattery && report.batteries.length === 1) {
+                const b = report.batteries[0];
+                y = this.drawModernInfoBox(doc, y, [
+                    { label: t('reportTestDate'), value: fmtDay(b.day) },
+                    { label: t('timeLabel'), value: b.time ?? '-' },
+                    { label: t('protocolLabel') + ':', value: `${t('level')} ${b.protocolLevel}` },
+                    { label: t('totalTime') + ':', value: this.formatTime(b.totalTime) },
+                    { label: t('athletesLabel'), value: `${report.stats.athletes}` },
+                    { label: t('temperatureLabel'), value: b.temperature != null ? `${b.temperature}°C` : 'N/I' },
+                ], 3);
+            } else {
+                const period = report.period
+                    ? (report.period.start === report.period.end
+                        ? fmtDay(report.period.start)
+                        : `${fmtDay(report.period.start)} - ${fmtDay(report.period.end)}`)
+                    : '-';
+                y = this.drawModernInfoBox(doc, y, [
+                    { label: t('period'), value: period },
+                    { label: t('mergedEvaluationsLabel'), value: `${report.groups.length}` },
+                    { label: t('mergedBatteriesLabel') + ':', value: `${report.stats.batteries}` },
+                    { label: t('athletesLabel'), value: `${report.stats.athletes}` },
+                    { label: t('protocolLabel') + ':', value: `${t('level')} ${levels}` },
+                ], 3);
+            }
 
             y = this.drawMetricCard(doc, y, [
                 { label: t('bestPV'), value: report.stats.bestPV.toFixed(1), color: UDESC_GREEN },
@@ -785,31 +708,36 @@ class ExportServiceClass {
 
             let hasRepeated = false;
 
-            // Ranking por nível
+            // Ranking por modalidade e nível
             for (const section of report.sections) {
                 y = this.ensureSpace(doc, y + 4, 45);
-                const sectionTitle = report.mixedLevels
-                    ? `${t('mergedRanking')} - ${t('level')} ${section.level}`
-                    : t('mergedRanking');
-                y = this.drawSectionTitleModern(doc, y, sectionTitle);
+                y = this.drawSectionTitleModern(doc, y, sectionTitle(t('mergedRanking'), section));
 
-                const headers = ['#', t('athlete'), t('team'), t('mergedCategoryShort'), t('pvCorr'), t('pvBruto'), t('fcLabel'), multiGroup ? t('mergedEvalBattery') : t('mergedBatteryShort'), t('status')];
-                const colWidths = [8, 40, 30, 18, 18, 18, 14, 20, 14];
+                const resultHeader = section.classified ? t('xlsClassification') : t('xlsRank');
+                const headers = isBattery
+                    ? ['#', t('athlete'), t('team'), t('mergedCategoryShort'), t('pvCorr'), t('fcLabel'), resultHeader]
+                    : ['#', t('athlete'), t('team'), t('mergedCategoryShort'), t('pvCorr'), t('fcLabel'), multiGroup ? t('mergedEvalBattery') : t('mergedBatteryShort'), resultHeader];
+                const colWidths = isBattery
+                    ? [8, 56, 32, 18, 24, 14, 28]
+                    : [8, 46, 30, 18, 22, 14, 18, 24];
 
                 const rows = section.ranking.map(entry => {
                     const r = entry.row;
                     if (entry.repeated) hasRepeated = true;
                     const fc = r.fcFinal != null ? `${r.fcFinal}` : (r.fcEstimada != null ? `~${r.fcEstimada}` : '-');
+                    const result = section.classified && entry.classification
+                        ? t(entry.classification.label)
+                        : ordinal(entry.position, lang);
+                    const battery = multiGroup ? `A${r.groupIndex + 1} / B${r.batteryNumber}` : `B${r.batteryNumber}`;
                     return [
                         `${entry.position}`,
-                        r.athleteName.substring(0, 20),
+                        r.athleteName.substring(0, isBattery ? 28 : 22),
                         (r.team || '-').substring(0, 15),
                         r.category || '-',
                         `${r.pvCorrigido.toFixed(1)}${entry.repeated ? '*' : ''}`,
-                        r.pvBruto.toFixed(1),
                         fc,
-                        multiGroup ? `A${r.groupIndex + 1} / B${r.batteryNumber}` : `B${r.batteryNumber}`,
-                        r.eliminatedByFailure ? t('statusEliminated') : t('statusOK'),
+                        ...(isBattery ? [] : [battery]),
+                        result,
                     ];
                 });
 
@@ -835,10 +763,7 @@ class ExportServiceClass {
                 for (const section of report.sections) {
                     if (!section.comparison.length) continue;
                     y = this.ensureSpace(doc, y + 8, 45);
-                    const sectionTitle = report.mixedLevels
-                        ? `${t('mergedComparison')} - ${t('level')} ${section.level}`
-                        : t('mergedComparison');
-                    y = this.drawSectionTitleModern(doc, y, sectionTitle);
+                    y = this.drawSectionTitleModern(doc, y, sectionTitle(t('mergedComparison'), section));
 
                     const nameW = 52;
                     const evoW = 22;
@@ -872,7 +797,7 @@ class ExportServiceClass {
             this.drawEnhancedFooter(doc, t, lang);
             doc.save(options.fileName);
         } catch (error) {
-            Logger.error('Erro ao gerar PDF unificado:', error);
+            Logger.error('Erro ao gerar PDF do relatório:', error);
             throw new Error('Não foi possível gerar o PDF.');
         }
     }

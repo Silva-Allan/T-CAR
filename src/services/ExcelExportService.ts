@@ -8,8 +8,7 @@
 // ======================================================================
 
 import type { Cell, Row, SheetData, Sheet } from 'write-excel-file/browser';
-import type { MergedReport, ReportRow } from '@/services/MergeService';
-import { ClassificationService } from '@/services/ClassificationService';
+import type { MergedReport } from '@/services/MergeService';
 import { Logger } from '@/utils/Logger';
 
 type T = (key: any, ...args: (string | number)[]) => string;
@@ -68,15 +67,17 @@ class ExcelExportServiceClass {
 
   private rankingSheet(report: MergedReport, t: T): Sheet<any> {
     const withLevel = report.mixedLevels;
+    const withGroup = report.mixedGroups;
     const multiGroup = report.groups.length > 1;
     const headers = [
+      ...(withGroup ? [t('xlsSport')] : []),
       ...(withLevel ? [t('xlsLevel')] : []),
-      t('xlsRank'), t('xlsAthlete'), t('xlsTeam'), t('xlsCategory'), t('xlsFieldPosition'),
-      t('xlsPvCorr'), t('xlsPvRaw'), t('xlsClassification'),
+      t('xlsRank'), t('xlsAthlete'), t('xlsTeam'), t('xlsCategory'), t('xlsGender'), t('xlsFieldPosition'),
+      t('xlsPvCorr'), t('xlsClassification'),
       t('xlsHrFinal'), t('xlsHrEstimated'),
       t('xlsStages'), t('xlsTotalReps'), t('xlsDistance'),
       ...(multiGroup ? [t('xlsEvaluation')] : []),
-      t('xlsBattery'), t('xlsStatus'), t('xlsNotes'),
+      t('xlsBattery'), t('xlsNotes'),
     ];
 
     const data: SheetData = [this.header(headers)];
@@ -84,15 +85,17 @@ class ExcelExportServiceClass {
       for (const entry of section.ranking) {
         const r = entry.row;
         data.push([
+          ...(withGroup ? [t(`group_${section.group}`)] : []),
           ...(withLevel ? [section.level] : []),
           entry.position,
           r.athleteName,
           r.team,
           r.category,
+          this.genderLabel(r.gender, t),
           this.positionLabel(r.position, t),
           this.pv(r.pvCorrigido),
-          this.pv(r.pvBruto),
-          this.classification(r, t),
+          // Sem tabela de referência, a colocação (coluna ao lado) é o resultado
+          entry.classification ? t(entry.classification.label) : t('xlsNoReferenceTable'),
           r.fcFinal,
           r.fcEstimada,
           r.completedStages,
@@ -100,7 +103,6 @@ class ExcelExportServiceClass {
           r.finalDistance,
           ...(multiGroup ? [report.groups[r.groupIndex].label] : []),
           r.batteryNumber,
-          r.eliminatedByFailure ? t('statusEliminated') : t('statusOK'),
           entry.repeated ? t('xlsBestOfBatteries') : null,
         ]);
       }
@@ -111,13 +113,14 @@ class ExcelExportServiceClass {
       sheet: t('xlsSheetRanking'),
       stickyRowsCount: 1,
       columns: [
+        ...(withGroup ? [{ width: 18 }] : []),
         ...(withLevel ? [{ width: 7 }] : []),
-        { width: 9 }, { width: 28 }, { width: 18 }, { width: 13 }, { width: 18 },
-        { width: 16 }, { width: 15 }, { width: 16 },
+        { width: 11 }, { width: 28 }, { width: 18 }, { width: 13 }, { width: 11 }, { width: 18 },
+        { width: 18 }, { width: 22 },
         { width: 14 }, { width: 18 },
         { width: 10 }, { width: 13 }, { width: 14 },
         ...(multiGroup ? [{ width: 22 }] : []),
-        { width: 9 }, { width: 9 }, { width: 24 },
+        { width: 9 }, { width: 30 },
       ],
     };
   }
@@ -125,11 +128,10 @@ class ExcelExportServiceClass {
   private detailSheet(report: MergedReport, t: T): Sheet<any> {
     const headers = [
       t('xlsEvaluation'), t('xlsDate'), t('xlsTime'), t('xlsBattery'), t('xlsLevel'),
-      t('xlsAthlete'), t('xlsTeam'), t('xlsCategory'), t('xlsFieldPosition'),
-      t('xlsPvCorr'), t('xlsPvRaw'),
+      t('xlsAthlete'), t('xlsTeam'), t('xlsCategory'), t('xlsGender'), t('xlsSport'), t('xlsFieldPosition'),
+      t('xlsPvCorr'),
       t('xlsHrFinal'), t('xlsHrEstimated'),
       t('xlsStages'), t('xlsRepsLastStage'), t('xlsTotalReps'), t('xlsDistance'),
-      t('xlsEliminated'),
     ];
 
     const rows = [...report.rows].sort((a, b) =>
@@ -147,16 +149,16 @@ class ExcelExportServiceClass {
         r.athleteName,
         r.team,
         r.category,
+        this.genderLabel(r.gender, t),
+        t(`sport_${r.sport}`),
         this.positionLabel(r.position, t),
         this.pv(r.pvCorrigido),
-        this.pv(r.pvBruto),
         r.fcFinal,
         r.fcEstimada,
         r.completedStages,
         r.completedRepsInLastStage,
         r.totalReps,
         r.finalDistance,
-        r.eliminatedByFailure ? t('yes') : t('no'),
       ]);
     }
 
@@ -166,19 +168,20 @@ class ExcelExportServiceClass {
       stickyRowsCount: 1,
       columns: [
         { width: 22 }, { width: 12 }, { width: 8 }, { width: 9 }, { width: 7 },
-        { width: 28 }, { width: 18 }, { width: 13 }, { width: 18 },
-        { width: 16 }, { width: 15 },
+        { width: 28 }, { width: 18 }, { width: 13 }, { width: 11 }, { width: 12 }, { width: 18 },
+        { width: 18 },
         { width: 14 }, { width: 18 },
         { width: 10 }, { width: 14 }, { width: 13 }, { width: 14 },
-        { width: 12 },
       ],
     };
   }
 
   private comparisonSheet(report: MergedReport, t: T): Sheet<any> {
     const withLevel = report.mixedLevels;
+    const withGroup = report.mixedGroups;
     const groupHeaders = report.groups.map((g, i) => `${i + 1}. ${g.label}`);
     const headers = [
+      ...(withGroup ? [t('xlsSport')] : []),
       ...(withLevel ? [t('xlsLevel')] : []),
       t('xlsAthlete'), t('xlsTeam'), t('xlsCategory'),
       ...groupHeaders,
@@ -189,6 +192,7 @@ class ExcelExportServiceClass {
     for (const section of report.sections) {
       for (const c of section.comparison) {
         data.push([
+          ...(withGroup ? [t(`group_${section.group}`)] : []),
           ...(withLevel ? [section.level] : []),
           c.athleteName,
           c.team,
@@ -204,8 +208,9 @@ class ExcelExportServiceClass {
       data,
       sheet: t('xlsSheetComparison'),
       stickyRowsCount: 1,
-      stickyColumnsCount: withLevel ? 2 : 1,
+      stickyColumnsCount: 1 + (withGroup ? 1 : 0) + (withLevel ? 1 : 0),
       columns: [
+        ...(withGroup ? [{ width: 18 }] : []),
         ...(withLevel ? [{ width: 7 }] : []),
         { width: 28 }, { width: 18 }, { width: 13 },
         ...groupHeaders.map(h => ({ width: Math.max(14, Math.min(h.length + 2, 30)) })),
@@ -272,12 +277,11 @@ class ExcelExportServiceClass {
     return label || position;
   }
 
-  private classification(r: ReportRow, t: T): string {
-    const cl = ClassificationService.getClassification(r.protocolLevel, r.pvCorrigido, {
-      birth_date: r.birthDate ?? undefined,
-      position: r.position ?? undefined,
-    });
-    return t(cl.label);
+  private genderLabel(gender: string | null, t: T): string | null {
+    if (gender === 'M') return t('genderM');
+    if (gender === 'F') return t('genderF');
+    if (gender === 'Outro') return t('genderOther');
+    return null;
   }
 
   private formatTime(seconds: number): string {

@@ -3,12 +3,15 @@
 // ======================================================================
 // Unifica várias baterias (tests) em um único relatório:
 //  - Baterias agrupadas em "avaliações" (por dia ou por avaliação salva)
-//  - Ranking geral por nível de protocolo
+//  - Ranking geral separado por modalidade (grupo) e nível de protocolo
+//  - Classificação pela tabela só para quem tem tabela de referência;
+//    os demais grupos recebem a colocação (1º, 2º, 3º...)
 //  - Comparativo entre avaliações (Aval. 1, Aval. 2, ...) quando há mais de uma
 // Não depende de UI nem de Supabase — recebe dados normalizados.
 // ======================================================================
 
-import { Athlete, AthleteResult, calculateCategory } from '@/models/types';
+import { Athlete, AthleteResult, PVClassification, Sport, calculateCategory, normalizeSport } from '@/models/types';
+import { ClassificationService, RANKING_GROUPS, RankingGroup } from '@/services/ClassificationService';
 
 export interface ReportResult {
   testId: string;
@@ -18,6 +21,8 @@ export interface ReportResult {
   birthDate: string | null;
   category: string | null;
   position: string | null;
+  sport: Sport;
+  gender: string | null;
   pvCorrigido: number;
   pvBruto: number;
   fcFinal: number | null;
@@ -87,6 +92,8 @@ export interface RankingEntry {
   row: ReportRow;
   /** Atleta fez mais de uma bateria na mesma avaliação (vale o melhor PV) */
   repeated: boolean;
+  /** Classificação pela tabela de referência; null nos grupos sem tabela */
+  classification: PVClassification | null;
 }
 
 export interface ComparisonEntry {
@@ -101,8 +108,11 @@ export interface ComparisonEntry {
   evolutionPct: number | null;
 }
 
-export interface LevelSection {
+export interface ReportSection {
   level: number;
+  group: RankingGroup;
+  /** true = mostra a classificação da tabela; false = mostra a colocação */
+  classified: boolean;
   ranking: RankingEntry[];
   comparison: ComparisonEntry[];
 }
@@ -111,7 +121,7 @@ export interface MergedReport {
   groups: ReportGroup[];
   batteries: ReportBattery[];
   rows: ReportRow[];
-  sections: LevelSection[];
+  sections: ReportSection[];
   stats: {
     athletes: number;
     batteries: number;
@@ -120,6 +130,8 @@ export interface MergedReport {
     worstPV: number;
   };
   mixedLevels: boolean;
+  /** Mais de um grupo (futebol, futebol feminino, handebol, outras) */
+  mixedGroups: boolean;
   period: { start: string; end: string } | null;
 }
 
@@ -167,6 +179,8 @@ class MergeServiceClass {
         birthDate: athlete?.birth_date || null,
         category: athlete?.birth_date ? calculateCategory(athlete.birth_date) : null,
         position: athlete?.position || null,
+        sport: normalizeSport(athlete?.sport),
+        gender: athlete?.gender || null,
         pvCorrigido: Number(r.pv_corrigido) || legacyPV,
         pvBruto: Number(r.pv_bruto) || legacyPV,
         fcFinal: r.fc_final ?? r.heart_rate ?? null,
@@ -219,6 +233,8 @@ class MergeServiceClass {
           birthDate,
           category: birthDate ? calculateCategory(birthDate) : null,
           position: athlete?.position || null,
+          sport: normalizeSport(athlete?.sport),
+          gender: athlete?.gender || null,
           pvCorrigido: ar.pvCorrigido,
           pvBruto: ar.pvBruto,
           fcFinal: ar.fcFinal ?? null,
@@ -342,10 +358,17 @@ class MergeServiceClass {
       });
     });
 
+    // Um ranking por grupo (futebol, futebol feminino, handebol, outras) e nível:
+    // o PV não é comparável entre níveis e só o futebol tem tabela de referência
     const levels = Array.from(new Set(rows.map(r => r.protocolLevel))).sort();
-    const sections = levels.map(level =>
-      this.buildSection(level, rows.filter(r => r.protocolLevel === level), groups.length)
-    );
+    const rankingGroups = RANKING_GROUPS.filter(g => rows.some(r => this.groupOf(r) === g));
+    const sections: ReportSection[] = [];
+    for (const group of rankingGroups) {
+      for (const level of levels) {
+        const sectionRows = rows.filter(r => r.protocolLevel === level && this.groupOf(r) === group);
+        if (sectionRows.length) sections.push(this.buildSection(level, group, sectionRows, groups.length));
+      }
+    }
 
     const rankingPVs = sections.flatMap(s => s.ranking.map(e => e.row.pvCorrigido));
     const days = groups.map(g => g.day).concat(batteries.map(b => b.day)).sort();
@@ -363,11 +386,17 @@ class MergeServiceClass {
         worstPV: rankingPVs.length ? Math.min(...rankingPVs) : 0,
       },
       mixedLevels: levels.length > 1,
+      mixedGroups: rankingGroups.length > 1,
       period: days.length ? { start: days[0], end: days[days.length - 1] } : null,
     };
   }
 
-  private buildSection(level: number, rows: ReportRow[], groupCount: number): LevelSection {
+  groupOf(r: ReportResult): RankingGroup {
+    return ClassificationService.rankingGroup({ sport: r.sport, gender: r.gender });
+  }
+
+  private buildSection(level: number, group: RankingGroup, rows: ReportRow[], groupCount: number): ReportSection {
+    const classified = group === 'football';
     // Linhas por atleta
     const byAthlete = new Map<string, ReportRow[]>();
     for (const r of rows) {
@@ -381,7 +410,12 @@ class MergeServiceClass {
         const lastGroup = Math.max(...athleteRows.map(r => r.groupIndex));
         const inLastGroup = athleteRows.filter(r => r.groupIndex === lastGroup);
         const best = inLastGroup.reduce((a, b) => (b.pvCorrigido > a.pvCorrigido ? b : a));
-        return { position: 0, row: best, repeated: inLastGroup.length > 1 };
+        const classification = classified
+          ? ClassificationService.classify(best.pvCorrigido, {
+            birth_date: best.birthDate, position: best.position, sport: best.sport, gender: best.gender,
+          })
+          : null;
+        return { position: 0, row: best, repeated: inLastGroup.length > 1, classification };
       })
       .sort((a, b) => b.row.pvCorrigido - a.row.pvCorrigido || a.row.athleteName.localeCompare(b.row.athleteName))
       .map((entry, i) => ({ ...entry, position: i + 1 }));
@@ -406,7 +440,7 @@ class MergeServiceClass {
       };
     }).sort((a, b) => a.athleteName.localeCompare(b.athleteName));
 
-    return { level, ranking, comparison };
+    return { level, group, classified, ranking, comparison };
   }
 }
 

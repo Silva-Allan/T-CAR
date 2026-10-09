@@ -20,13 +20,13 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { SupabaseService, EvaluationWithTests } from '@/services/SupabaseService';
-import { MergeService, ReportGroupInput, ReportTest } from '@/services/MergeService';
+import { MergeService, ReportGroupInput, ReportSection, ReportTest } from '@/services/MergeService';
 import { ExcelExportService } from '@/services/ExcelExportService';
 import { ExportService } from '@/services/ExportService';
 import { CalculatorService } from '@/services/CalculatorService';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, ordinal } from '@/lib/utils';
 import { Logger } from '@/utils/Logger';
 
 const ALL = '__all__';
@@ -266,6 +266,10 @@ export default function MergedReport() {
   }
 
   const multiGroup = report.groups.length > 1;
+  const sectionTitle = (section: ReportSection) => [
+    report.mixedGroups ? t(`group_${section.group}` as any) : null,
+    report.mixedLevels ? `${t('level')} ${section.level}` : null,
+  ].filter(Boolean).join(' - ');
   const periodText = report.period
     ? (report.period.start === report.period.end
       ? formatDay(report.period.start)
@@ -386,20 +390,20 @@ export default function MergedReport() {
             {/* Ranking */}
             <TabsContent value="ranking" className="space-y-4">
               {report.sections.map(section => (
-                <div key={section.level} className="space-y-2">
-                  {report.mixedLevels && (
-                    <h3 className="font-semibold text-sm">{t('level')} {section.level}</h3>
+                <div key={`${section.group}-${section.level}`} className="space-y-2">
+                  {sectionTitle(section) && (
+                    <h3 className="font-semibold text-sm">{sectionTitle(section)}</h3>
                   )}
                   {section.ranking.map(entry => (
                     <div
                       key={entry.row.athleteId}
-                      className={cn(
-                        'flex items-center justify-between gap-3 p-3 rounded-lg glass-card',
-                        entry.row.eliminatedByFailure && 'border border-destructive/30'
-                      )}
+                      className="flex items-center justify-between gap-3 p-3 rounded-lg glass-card"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-7 h-7 shrink-0 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
+                        <span
+                          className="w-7 h-7 shrink-0 rounded-full text-white text-xs flex items-center justify-center font-bold"
+                          style={{ backgroundColor: entry.classification?.color ?? 'hsl(var(--primary))' }}
+                        >
                           {entry.position}
                         </span>
                         <div className="min-w-0">
@@ -416,7 +420,13 @@ export default function MergedReport() {
                         <p className="font-mono font-bold text-primary">
                           {entry.row.pvCorrigido.toFixed(1)}{entry.repeated && '*'}
                         </p>
-                        <p className="text-xs text-muted-foreground">km/h</p>
+                        {entry.classification ? (
+                          <p className="text-xs font-medium" style={{ color: entry.classification.color }}>
+                            {t(entry.classification.label as any)}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">{ordinal(entry.position, lang as string)}</p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -431,9 +441,9 @@ export default function MergedReport() {
             {multiGroup && (
               <TabsContent value="comparison" className="space-y-4">
                 {report.sections.map(section => (
-                  <div key={section.level} className="space-y-2">
-                    {report.mixedLevels && (
-                      <h3 className="font-semibold text-sm">{t('level')} {section.level}</h3>
+                  <div key={`${section.group}-${section.level}`} className="space-y-2">
+                    {sectionTitle(section) && (
+                      <h3 className="font-semibold text-sm">{sectionTitle(section)}</h3>
                     )}
                     <div className="glass-card rounded-xl overflow-x-auto">
                       <table className="w-full text-sm">

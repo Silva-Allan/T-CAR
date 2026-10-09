@@ -13,7 +13,7 @@ import { ClassificationService } from '@/services/ClassificationService';
 import { ExportService } from '@/services/ExportService';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
-import { calculateAge, calculateCategory } from '@/models/types';
+import { calculateAge, calculateCategory, normalizeSport } from '@/models/types';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceLine, LabelList, Cell
@@ -163,12 +163,9 @@ export default function AthleteProfile() {
 
   // Classificação baseada no ÚLTIMO teste (regra T-CAR)
   const lastTest = tests[0];
+  // null quando o atleta não tem tabela de referência (handebol, outras, futebol feminino)
   const classification = lastTest
-    ? ClassificationService.getClassification(
-      lastTest.test.protocol_level as 1 | 2,
-      Number(lastTest.pv_corrigido),
-      athlete
-    )
+    ? ClassificationService.classify(Number(lastTest.pv_corrigido), athlete)
     : null;
 
   // Chart data — barras para cada teste + linha da média
@@ -178,7 +175,6 @@ export default function AthleteProfile() {
     .map(t => ({
       date: formatDate(t.test.date),
       pv: Number(t.pv_corrigido),
-      pvBruto: Number(t.pv_bruto),
       fc: t.fc_final ?? t.fc_estimada ?? null,
       fcType: t.fc_final != null ? 'medida' : t.fc_estimada != null ? 'estimada' : null,
       reps: t.total_reps,
@@ -204,11 +200,6 @@ export default function AthleteProfile() {
         <div className="flex justify-between items-center gap-6">
           <span className="text-muted-foreground">{t('pvCorrigidoLabel')}</span>
           <span className="font-bold text-primary text-sm">{d?.pv?.toFixed(1)} <span className="font-normal text-[10px]">km/h</span></span>
-        </div>
-        {/* PV Bruto */}
-        <div className="flex justify-between items-center gap-6">
-          <span className="text-muted-foreground">{t('pvBrutoLabel')}</span>
-          <span className="font-mono text-[11px]">{d?.pvBruto?.toFixed(1)} km/h</span>
         </div>
         {/* Divider */}
         <div className="h-px bg-border/50" />
@@ -242,7 +233,6 @@ export default function AthleteProfile() {
           date: t.test.date,
           protocolLevel: t.test.protocol_level,
           pvCorrigido: Number(t.pv_corrigido),
-          pvBruto: Number(t.pv_bruto),
           fcFinal: t.fc_final,
           fcEstimada: t.fc_estimada,
           totalReps: t.total_reps,
@@ -324,9 +314,10 @@ export default function AthleteProfile() {
               <h2 className="text-xl font-bold leading-none">{athlete.name}</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 {[
+                  t(`sport_${normalizeSport((athlete as any).sport)}` as any),
                   athlete.position ? t(athlete.position as any) : null,
                   athlete.team
-                ].filter(Boolean).join(' • ') || t('noPosition')}
+                ].filter(Boolean).join(' • ')}
               </p>
             </div>
           </div>
@@ -500,20 +491,13 @@ export default function AthleteProfile() {
           ) : (
             <div className="space-y-2">
               {tests.map((test, index) => {
-                const testClassification = ClassificationService.getClassification(
-                  test.test.protocol_level as 1 | 2,
-                  Number(test.pv_corrigido),
-                  athlete
-                );
+                const testClassification = ClassificationService.classify(Number(test.pv_corrigido), athlete);
                 const fc = test.fc_final ?? test.fc_estimada;
 
                 return (
                   <div
                     key={test.id}
-                    className={cn(
-                      "glass-card p-4 rounded-xl flex items-center justify-between animate-fade-in",
-                      test.eliminated_by_failure && "border-destructive/30"
-                    )}
+                    className="glass-card p-4 rounded-xl flex items-center justify-between animate-fade-in"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div className="space-y-0.5">
@@ -521,13 +505,15 @@ export default function AthleteProfile() {
                         {formatDate(test.test.date)} • Nível {test.test.protocol_level}
                       </p>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs px-2 py-0.5 rounded-full"
-                          style={{
-                            backgroundColor: `${testClassification.color}20`,
-                            color: testClassification.color
-                          }}>
-                          {t(testClassification.label as any)}
-                        </span>
+                        {testClassification && (
+                          <span className="text-xs px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor: `${testClassification.color}20`,
+                              color: testClassification.color
+                            }}>
+                            {t(testClassification.label as any)}
+                          </span>
+                        )}
                         {fc != null && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Heart className="w-3 h-3" />
@@ -537,10 +523,6 @@ export default function AthleteProfile() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="p-1 px-2 rounded-lg bg-background/50 border border-border/50">
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">{t('pvBrutoLabel')}</p>
-                        <p className="text-sm font-mono font-bold">{Number(test.pv_bruto).toFixed(1)} <span className="text-[10px] font-normal text-muted-foreground">km/h</span></p>
-                      </div>
                       <div className="p-1 px-2 rounded-lg bg-background/50 border border-border/50">
                         <p className="text-[10px] text-muted-foreground uppercase font-bold">{t('distanceLabel')}</p>
                         <p className="text-sm font-mono font-bold">{test.final_distance} <span className="text-[10px] font-normal text-muted-foreground">m</span></p>

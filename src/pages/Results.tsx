@@ -25,13 +25,12 @@ import { SyncService } from '@/services/SyncService';
 import { ExportService } from '@/services/ExportService';
 import { ExcelExportService } from '@/services/ExcelExportService';
 import { MergeService } from '@/services/MergeService';
-import { ClassificationService } from '@/services/ClassificationService';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AthleteResult } from '@/models/types';
-import { cn } from '@/lib/utils';
+import { cn, ordinal } from '@/lib/utils';
 import { Logger } from '@/utils/Logger';
 import {
   AlertDialog,
@@ -260,22 +259,28 @@ export default function Results() {
     }
   };
 
+  // Mesmo relatório usado pelo Excel, pelo PDF e pela lista abaixo: um ranking
+  // por modalidade, com classificação só para quem tem tabela de referência
+  const reportTest = MergeService.fromAthleteResults(
+    {
+      id: multiResult.id || 'current',
+      date: multiResult.completedAt || new Date().toISOString(),
+      protocolLevel: multiResult.protocol.level,
+      totalTime: Math.round(multiResult.totalTime),
+      temperature: temperature ? parseFloat(temperature) : null,
+    },
+    enrichedResults,
+    selectedAthletes
+  );
+  const locale = lang === 'en' ? 'en-US' : (lang as string) === 'es' ? 'es-ES' : 'pt-BR';
+  const report = MergeService.merge([reportTest], [{
+    key: reportTest.day,
+    label: new Date(`${reportTest.day}T12:00:00`).toLocaleDateString(locale),
+    testIds: [reportTest.id],
+  }]);
+
   const handleExportExcel = async () => {
     try {
-      const reportTest = MergeService.fromAthleteResults(
-        {
-          id: multiResult.id || 'current',
-          date: multiResult.completedAt || new Date().toISOString(),
-          protocolLevel: multiResult.protocol.level,
-          totalTime: Math.round(multiResult.totalTime),
-          temperature: temperature ? parseFloat(temperature) : null,
-        },
-        enrichedResults,
-        selectedAthletes
-      );
-      const locale = lang === 'en' ? 'en-US' : (lang as string) === 'es' ? 'es-ES' : 'pt-BR';
-      const label = new Date(`${reportTest.day}T12:00:00`).toLocaleDateString(locale);
-      const report = MergeService.merge([reportTest], [{ key: reportTest.day, label, testIds: [reportTest.id] }]);
       await ExcelExportService.exportReport(report, t, `tcar_teste_${reportTest.day}.xlsx`);
     } catch (error) {
       toast({ variant: 'destructive', title: t('excelExportError') });
@@ -284,18 +289,11 @@ export default function Results() {
 
   const handleExportPDF = async () => {
     try {
-      await ExportService.exportTestResultsToPDF(
-        multiResult.protocol.level,
-        multiResult.totalTime,
-        new Date().toISOString(),
-        enrichedResults,
-        t,
-        lang,
-        {
-          team: trainerProfile?.club || undefined,
-          temperature: temperature ? parseFloat(temperature) : null
-        }
-      );
+      await ExportService.exportMergedReportToPDF(report, t, lang, {
+        kind: 'battery',
+        team: trainerProfile?.club || null,
+        fileName: `tcar_teste_${reportTest.day}.pdf`,
+      });
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -304,9 +302,6 @@ export default function Results() {
       });
     }
   };
-
-  // Sort by PV corrigido (ranking)
-  const sortedResults = [...enrichedResults].sort((a, b) => b.pvCorrigido - a.pvCorrigido);
 
   return (
     <PageContainer title={t('testResults')}>
@@ -370,21 +365,21 @@ export default function Results() {
           </div>
           <p className="text-xs text-muted-foreground">{t('rankingByPVCorrigido')}</p>
 
-          {sortedResults.map((ar, index) => {
-            const classification = ClassificationService.getClassification(
-              multiResult.protocol.level,
-              ar.pvCorrigido,
-              selectedAthletes.find(a => a.id === ar.athleteId)
-            );
+          {report.sections.map(section => (
+          <div key={`${section.group}-${section.level}`} className="space-y-3">
+          {report.mixedGroups && (
+            <h4 className="text-sm font-semibold text-muted-foreground pt-1">{t(`group_${section.group}` as any)}</h4>
+          )}
+          {section.ranking.map((entry, index) => {
+            const ar = enrichedResults.find(r => r.athleteId === entry.row.athleteId)!;
+            const classification = entry.classification;
+            const badgeColor = classification?.color ?? 'hsl(var(--primary))';
             const isExpanded = expandedAthlete === ar.athleteId;
 
             return (
               <div
                 key={ar.athleteId}
-                className={cn(
-                  "glass-card rounded-xl overflow-hidden animate-slide-up",
-                  ar.eliminatedByFailure && "border-destructive/30"
-                )}
+                className="glass-card rounded-xl overflow-hidden animate-slide-up"
                 style={{ animationDelay: `${index * 100}ms` }}
               >
                 {/* Main row */}
@@ -395,22 +390,23 @@ export default function Results() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                        style={{ backgroundColor: classification.color }}>
-                        {index + 1}
+                        style={{ backgroundColor: badgeColor }}>
+                        {entry.position}
                       </div>
                       <div>
                         <span className="font-medium">{ar.athleteName}</span>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs px-2 py-0.5 rounded-full"
-                            style={{
-                              backgroundColor: `${classification.color}20`,
-                              color: classification.color
-                            }}>
-                            {t(classification.label as any)}
-                          </span>
-                          {ar.eliminatedByFailure && (
-                            <span className="text-xs text-destructive bg-destructive/10 px-2 py-0.5 rounded">
-                              {t('twoFailures')}
+                          {classification ? (
+                            <span className="text-xs px-2 py-0.5 rounded-full"
+                              style={{
+                                backgroundColor: `${classification.color}20`,
+                                color: classification.color
+                              }}>
+                              {t(classification.label as any)}
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                              {t('placeLabel', ordinal(entry.position, lang))}
                             </span>
                           )}
                         </div>
@@ -432,8 +428,8 @@ export default function Results() {
                   <div className="px-4 pb-4 space-y-3 border-t border-border/50 pt-3">
                     <div className="grid grid-cols-3 gap-2 text-sm">
                       <div className="text-center">
-                        <p className="text-muted-foreground text-xs">{t('rawPV')}</p>
-                        <p className="font-mono font-bold">{ar.pvBruto.toFixed(1)}</p>
+                        <p className="text-muted-foreground text-xs">{t('stages')}</p>
+                        <p className="font-mono font-bold">{ar.completedStages}</p>
                       </div>
                       <div className="text-center">
                         <p className="text-muted-foreground text-xs">{t('totalReps')}</p>
@@ -445,17 +441,6 @@ export default function Results() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="text-center">
-                        <p className="text-muted-foreground text-xs">{t('stages')}</p>
-                        <p className="font-mono font-bold">{ar.completedStages}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="font-mono font-bold" style={{ color: classification.color }}>
-                          P{classification.percentile}
-                        </p>
-                      </div>
-                    </div>
 
                     {/* Heart rate input */}
                     <div className="flex items-center gap-2 bg-background/50 p-2 rounded-lg">
@@ -489,6 +474,8 @@ export default function Results() {
               </div>
             );
           })}
+          </div>
+          ))}
         </div>
 
         {/* Save to history button */}

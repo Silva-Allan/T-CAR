@@ -8,7 +8,7 @@ import { SupabaseService } from '@/services/SupabaseService';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
-import { calculateAge, calculateCategory, VALID_POSITIONS } from '@/models/types';
+import { calculateAge, calculateCategory, normalizeSport, positionsForSport, SPORTS, type Sport } from '@/models/types';
 import { AthleteFilterBar, applyAthleteFilters, EMPTY_FILTERS, type AthleteFilters } from '@/components/AthleteFilterBar';
 import {
   AlertDialog,
@@ -28,6 +28,7 @@ interface Athlete {
   email: string | null;
   birth_date: string | null;
   gender: 'M' | 'F' | 'Outro' | null;
+  sport: string | null;
   team: string | null;
   position: string | null;
 }
@@ -56,6 +57,7 @@ export default function Athletes() {
   const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState<string>('');
   const [team, setTeam] = useState('');
+  const [sport, setSport] = useState<Sport>('football');
   const [position, setPosition] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -134,8 +136,9 @@ export default function Athletes() {
           email: email.trim() || null,
           birth_date: birthDate || null,
           gender: (gender as any) || null,
+          sport,
           team: team || null,
-          position: position || null,
+          position: sportPositions.length ? position || null : null,
         });
       } else {
         await SupabaseService.createAthlete({
@@ -143,8 +146,9 @@ export default function Athletes() {
           email: email.trim() || null,
           birth_date: birthDate || null,
           gender: (gender as any) || null,
+          sport,
           team: team || null,
-          position: position || null,
+          position: sportPositions.length ? position || null : null,
         });
       }
       await loadAthletes(0, true); // Reload all athletes after add/edit
@@ -163,6 +167,7 @@ export default function Athletes() {
     setEmail(athlete.email || '');
     setBirthDate(athlete.birth_date || '');
     setGender(athlete.gender || '');
+    setSport(normalizeSport(athlete.sport));
     setTeam(athlete.team || '');
     setPosition(athlete.position || '');
     setShowForm(true);
@@ -186,7 +191,17 @@ export default function Athletes() {
     setEmail('');
     setBirthDate('');
     setGender('');
+    setSport('football');
     setTeam('');
+    setPosition('');
+  };
+
+  // Posições da modalidade escolhida; "Outras" não pede posição
+  const sportPositions = positionsForSport(sport);
+
+  const handleSportChange = (next: Sport) => {
+    if (next === sport) return;
+    setSport(next);
     setPosition('');
   };
 
@@ -197,6 +212,8 @@ export default function Athletes() {
       year: '2-digit'
     });
   };
+
+  const activeFilterCount = [filters.sport, filters.position, filters.category, filters.gender].filter(Boolean).length;
 
   if (loading) {
     return (
@@ -230,15 +247,15 @@ export default function Athletes() {
             variant="ghost"
             size="sm"
             className={cn(
-              filters.position || filters.category || filters.gender
+              activeFilterCount > 0
                 ? "bg-primary/10 text-primary border border-primary/30"
                 : "text-muted-foreground"
             )}
           >
             <SlidersHorizontal className="w-4 h-4" />
-            {(filters.position || filters.category || filters.gender) && (
+            {activeFilterCount > 0 && (
               <span className="ml-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
-                {[filters.position, filters.category, filters.gender].filter(Boolean).length}
+                {activeFilterCount}
               </span>
             )}
           </Button>
@@ -312,9 +329,33 @@ export default function Athletes() {
                 />
               </div>
               <div className="space-y-2 sm:col-span-2">
+                <label className="text-xs font-medium text-muted-foreground">{t('sport')} <span className="text-destructive">*</span></label>
+                <div className="flex gap-2">
+                  {SPORTS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => handleSportChange(s)}
+                      className={cn(
+                        "flex-1 py-2 px-3 rounded-lg border text-sm transition-all",
+                        sport === s
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover:bg-accent"
+                      )}
+                    >
+                      {t(`sport_${s}` as any)}
+                    </button>
+                  ))}
+                </div>
+                {sport === 'other' && (
+                  <p className="text-xs text-muted-foreground">{t('sportOtherHint')}</p>
+                )}
+              </div>
+              {sportPositions.length > 0 && (
+              <div className="space-y-2 sm:col-span-2">
                 <label className="text-xs font-medium text-muted-foreground">{t('position')} <span className="text-destructive">*</span></label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {VALID_POSITIONS.map((pos) => (
+                  {sportPositions.map((pos) => (
                     <button
                       key={pos}
                       type="button"
@@ -331,12 +372,13 @@ export default function Athletes() {
                   ))}
                 </div>
               </div>
+              )}
             </div>
             <div className="flex gap-2 pt-2">
               <Button
                 className="flex-1"
                 onClick={handleSubmit}
-                disabled={submitting || !name || !birthDate || !position}
+                disabled={submitting || !name || !birthDate || (sportPositions.length > 0 && !position)}
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
                 {editingId ? t('save') : t('add')}
@@ -398,15 +440,7 @@ export default function Athletes() {
                   (a.position && a.position.toLowerCase().includes(searchTerm.toLowerCase()));
                 return matchesSearch;
               })
-              .filter(a => {
-                if (filters.position && a.position !== filters.position) return false;
-                if (filters.category) {
-                  if (!a.birth_date) return false;
-                  if (calculateCategory(a.birth_date) !== filters.category) return false;
-                }
-                if (filters.gender && a.gender !== filters.gender) return false;
-                return true;
-              })
+              .filter(a => applyAthleteFilters([a], filters).length > 0)
               .map((athlete, index) => (
                 <div
                   key={athlete.id}
@@ -422,8 +456,11 @@ export default function Athletes() {
                       <p className="font-medium truncate">{athlete.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-sm text-muted-foreground truncate">
-                          {athlete.position ? t(athlete.position as any) : t('noPosition')}
-                          {athlete.team && ` • ${athlete.team}`}
+                          {[
+                            t(`sport_${normalizeSport(athlete.sport)}` as any),
+                            athlete.position ? t(athlete.position as any) : null,
+                            athlete.team,
+                          ].filter(Boolean).join(' • ')}
                         </p>
                         {athlete.birth_date && (
                           <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground font-medium">

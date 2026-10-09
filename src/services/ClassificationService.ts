@@ -5,7 +5,7 @@
 // Tabelas normativas oficiais T-CAR (2026).
 // ======================================================================
 
-import { PVClassification, calculateCategory } from '@/models/types';
+import { PVClassification, calculateCategory, normalizeSport } from '@/models/types';
 
 /**
  * Matriz Normativa T-CAR
@@ -68,7 +68,38 @@ const CLASSIFICATION_TIERS = [
     { label: 'classVeryHigh', percentile: 99, color: '#006633' },    // P > 80
 ];
 
+/**
+ * Grupo do atleta nos rankings/relatórios. Só 'football' tem tabela de
+ * referência; os demais recebem a colocação (1º, 2º, 3º...).
+ * As tabelas normativas não separam por sexo e vêm de atletas homens,
+ * então atletas mulheres de futebol ficam num grupo próprio, sem classificação.
+ */
+export type RankingGroup = 'football' | 'football_f' | 'handball' | 'other';
+export const RANKING_GROUPS: RankingGroup[] = ['football', 'football_f', 'handball', 'other'];
+
+type AthleteRef = { birth_date?: string | null; birthDate?: string | null; position?: string | null; sport?: string | null; gender?: string | null };
+
 class ClassificationServiceClass {
+    rankingGroup(athlete?: AthleteRef | null): RankingGroup {
+        const sport = normalizeSport(athlete?.sport);
+        if (sport === 'football') return athlete?.gender === 'F' ? 'football_f' : 'football';
+        return sport;
+    }
+
+    /** Existe tabela de referência para este atleta? */
+    hasReferenceTable(athlete?: AthleteRef | null): boolean {
+        return this.rankingGroup(athlete) === 'football';
+    }
+
+    /** Classificação pela tabela, ou null quando o atleta não tem tabela de referência */
+    classify(pvCorrigido: number, athlete?: AthleteRef | null): PVClassification | null {
+        if (!this.hasReferenceTable(athlete)) return null;
+        return this.getClassification(1, pvCorrigido, {
+            birth_date: athlete?.birth_date ?? athlete?.birthDate ?? undefined,
+            position: athlete?.position ?? undefined,
+        });
+    }
+
     /**
      * Obtém a classificação PV-TCAR baseada nos dados do atleta e no PV atingido.
      */

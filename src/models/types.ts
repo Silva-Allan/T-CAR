@@ -22,7 +22,8 @@ export interface Athlete {
   password?: string; // Para futura versão/login
   birthDate?: string;
   birth_date?: string; // Compatiblidade com Supabase
-  gender?: 'M' | 'F' | 'Prefiro não dizer';
+  gender?: 'M' | 'F' | 'Outro' | 'Prefiro não dizer';
+  sport?: string | null;
   team?: string;
   position?: string;
   createdAt: string;
@@ -174,6 +175,32 @@ export const VALID_POSITIONS = [
 ] as const;
 
 export type Position = typeof VALID_POSITIONS[number];
+
+export const HANDBALL_POSITIONS = [
+  'handball_goalkeeper', // Goleiro
+  'handball_wing',       // Ponta
+  'handball_back',       // Armador lateral
+  'handball_center',     // Armador central
+  'handball_pivot',      // Pivô
+] as const;
+
+// --- Modalidade ---
+// 'other' = outras modalidades ou não atletas (ex.: turmas de faculdade): sem posição
+
+export const SPORTS = ['football', 'handball', 'other'] as const;
+export type Sport = typeof SPORTS[number];
+
+/** Registros antigos (null, 'athletics' do schema inicial) são de futebol */
+export function normalizeSport(sport?: string | null): Sport {
+  return sport === 'handball' || sport === 'other' ? sport : 'football';
+}
+
+export function positionsForSport(sport?: string | null): readonly string[] {
+  const s = normalizeSport(sport);
+  if (s === 'football') return VALID_POSITIONS;
+  if (s === 'handball') return HANDBALL_POSITIONS;
+  return [];
+}
 
 export function calculateAge(birthDate: string): number {
   const today = new Date();

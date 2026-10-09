@@ -66,6 +66,7 @@ export default function SelectAthletes() {
         team: a.team,
         position: a.position,
         gender: (a as any).gender || null,
+        sport: a.sport,
         birth_date: a.birth_date || undefined,
         birthDate: a.birth_date || undefined,
         createdAt: a.created_at,
@@ -113,7 +114,7 @@ export default function SelectAthletes() {
   const canContinue = selectedIds.size >= MIN_ATHLETES;
   const canAddMore = selectedIds.size < MAX_ATHLETES;
 
-  const hasActiveFilters = filters.position || filters.category || filters.gender;
+  const hasActiveFilters = filters.sport || filters.position || filters.category || filters.gender;
 
   // Aplicar busca textual + filtros
   const filteredAthletes = applyAthleteFilters(
@@ -162,7 +163,7 @@ export default function SelectAthletes() {
             {t('filters') || 'Filtros'}
             {hasActiveFilters && (
               <span className="ml-1 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold">
-                {[filters.position, filters.category, filters.gender].filter(Boolean).length}
+                {[filters.sport, filters.position, filters.category, filters.gender].filter(Boolean).length}
               </span>
             )}
           </Button>

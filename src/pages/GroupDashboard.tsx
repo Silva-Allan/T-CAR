@@ -312,11 +312,8 @@ export default function GroupDashboard() {
                                 <div className="space-y-2">
                                     {ranking.slice(3).map((item, index) => {
                                         const actualIndex = index + 3;
-                                        const classification = ClassificationService.getClassification(
-                                            1,
-                                            item.avgPV,
-                                            { birth_date: (item as any).birth_date, position: (item as any).position }
-                                        );
+                                        // null sem tabela de referência (handebol, outras, futebol feminino)
+                                        const classification = ClassificationService.classify(item.avgPV, item as any);
 
                                         return (
                                             <div
@@ -331,13 +328,15 @@ export default function GroupDashboard() {
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-medium truncate">{item.athleteName}</p>
                                                     <div className="flex items-center gap-2 mt-0.5">
-                                                        <span className="text-xs px-2 py-0.5 rounded-full"
-                                                            style={{
-                                                                backgroundColor: `${classification.color}20`,
-                                                                color: classification.color
-                                                            }}>
-                                                            {t(classification.label as any)}
-                                                        </span>
+                                                        {classification && (
+                                                            <span className="text-xs px-2 py-0.5 rounded-full"
+                                                                style={{
+                                                                    backgroundColor: `${classification.color}20`,
+                                                                    color: classification.color
+                                                                }}>
+                                                                {t(classification.label as any)}
+                                                            </span>
+                                                        )}
                                                         <span className="text-xs text-muted-foreground">
                                                             {item.testCount} {item.testCount !== 1 ? t('summaryTests') : t('test').toLowerCase()}
                                                         </span>
