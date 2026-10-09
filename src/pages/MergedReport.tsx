@@ -147,7 +147,7 @@ export default function MergedReport() {
   const handleExportExcel = async () => {
     setExporting('xlsx');
     try {
-      await ExcelExportService.exportReport(report, t, `${fileBase()}.xlsx`);
+      await ExcelExportService.exportReport(report, t, `${fileBase()}.xlsx`, { title, kind: 'merged' });
     } catch {
       toast({ variant: 'destructive', title: t('excelExportError') });
     } finally {

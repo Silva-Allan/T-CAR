@@ -1,27 +1,54 @@
 // ======================================================================
-// T-CAR 2.0 — Excel Export Service
+// T-CAR 2.1 — Excel Export Service
 // ======================================================================
-// Gera .xlsx real (números como número, datas como data) a partir de um
-// MergedReport. Serve tanto para o relatório unificado quanto para uma
-// bateria isolada (relatório de um teste só).
+// Gera .xlsx real (números como número, datas como data) com a identidade
+// do T-CAR em todas as abas: logo oficial, título, "gerado pelo aplicativo
+// T-CAR", faixa verde, tabela com linhas alternadas e assinatura no fim.
+// Serve para o relatório unificado, a bateria isolada, o ranking do grupo
+// e o histórico do atleta.
 // A biblioteca é carregada sob demanda para não pesar no bundle do PWA.
 // ======================================================================
 
 import type { Cell, Row, SheetData, Sheet } from 'write-excel-file/browser';
 import type { MergedReport } from '@/services/MergeService';
+import { BRAND, LOGO_PX, loadLogo } from '@/services/BrandService';
 import { Logger } from '@/utils/Logger';
 
 type T = (key: any, ...args: (string | number)[]) => string;
 
-const HEADER_STYLE = { fontWeight: 'bold', backgroundColor: '#006633', textColor: '#FFFFFF' } as const;
+const HEADER_STYLE = {
+  fontWeight: 'bold',
+  backgroundColor: BRAND.green,
+  textColor: '#FFFFFF',
+  alignVertical: 'center',
+  wrap: true,
+  borderColor: BRAND.greenDark,
+  borderStyle: 'thin',
+} as const;
 const PV_FORMAT = '0.0';
 const SIGNED_FORMAT = '+0.0;-0.0;0.0';
 const SIGNED_PCT_FORMAT = '+0.0%;-0.0%;0.0%';
 const DATE_FORMAT = 'dd/mm/yyyy';
 
+// Linhas do bloco de abertura antes da tabela (título, subtítulo, faixa verde)
+const BRAND_ROWS = 3;
+
+interface DocInfo {
+  /** Título do documento, ex.: "Pré-temporada Sub-15" ou "Relatório do Teste" */
+  title: string;
+  /** Contexto curto depois da assinatura, ex.: período e número de atletas */
+  context?: string;
+}
+
 class ExcelExportServiceClass {
-  async exportReport(report: MergedReport, t: T, fileName: string): Promise<void> {
+  async exportReport(
+    report: MergedReport,
+    t: T,
+    fileName: string,
+    options: { title?: string | null; kind?: 'battery' | 'merged' } = {}
+  ): Promise<void> {
     try {
+      const title = options.title || (options.kind === 'battery' ? t('reportTest') : t('mergedReportTitle'));
       const sheets: Sheet<any>[] = [
         this.rankingSheet(report, t),
         this.detailSheet(report, t),
@@ -29,8 +56,9 @@ class ExcelExportServiceClass {
       if (report.groups.length > 1) sheets.push(this.comparisonSheet(report, t));
       sheets.push(this.batteriesSheet(report, t));
 
-      const { default: writeXlsxFile } = await import('write-excel-file/browser');
-      await writeXlsxFile(sheets).toFile(fileName);
+      const context = [this.periodText(report, t), `${report.stats.athletes} ${t('athletesPlural')}`]
+        .filter(Boolean).join(' · ');
+      await this.write(sheets, { title, context }, t, fileName);
     } catch (error) {
       Logger.error('Erro ao gerar Excel:', error);
       throw new Error('Não foi possível gerar o Excel.');
@@ -41,24 +69,221 @@ class ExcelExportServiceClass {
   async exportGroupRanking(
     ranking: { position: number; athleteName: string; avgPV: number; lastPV: number; testCount: number }[],
     t: T,
-    fileName: string
+    fileName: string,
+    options: { team?: string | null } = {}
   ): Promise<void> {
     try {
       const data: SheetData = [
         this.header([t('xlsRank'), t('xlsAthlete'), t('xlsAvgPV'), t('xlsLastPV'), t('xlsTestCount')]),
         ...ranking.map(r => [r.position, r.athleteName, this.pv(r.avgPV), this.pv(r.lastPV), r.testCount]),
       ];
-      const { default: writeXlsxFile } = await import('write-excel-file/browser');
-      await writeXlsxFile([{
+      const sheet: Sheet<any> = {
         data,
         sheet: t('xlsSheetRanking'),
-        stickyRowsCount: 1,
-        columns: [{ width: 11 }, { width: 28 }, { width: 18 }, { width: 18 }, { width: 10 }],
-      }]).toFile(fileName);
+        columns: [{ width: 11 }, { width: 30 }, { width: 18 }, { width: 18 }, { width: 10 }],
+      };
+      const context = [options.team, `${ranking.length} ${t('athletesPlural')}`].filter(Boolean).join(' · ');
+      await this.write([sheet], { title: t('reportGroup'), context }, t, fileName);
     } catch (error) {
       Logger.error('Erro ao gerar Excel do ranking:', error);
       throw new Error('Não foi possível gerar o Excel.');
     }
+  }
+
+  /** Histórico de testes de um atleta (perfil do atleta) */
+  async exportAthleteHistory(
+    athlete: { name: string; team?: string | null; category?: string | null; sport?: string | null; position?: string | null },
+    tests: {
+      date: string;
+      protocolLevel: number;
+      pvCorrigido: number;
+      classification: string | null;
+      fcFinal?: number | null;
+      fcEstimada?: number | null;
+      completedStages?: number | null;
+      totalReps?: number | null;
+      finalDistance?: number | null;
+    }[],
+    t: T,
+    fileName: string
+  ): Promise<void> {
+    try {
+      const data: SheetData = [
+        this.header([
+          t('xlsDate'), t('xlsLevel'), t('xlsPvCorr'), t('xlsClassification'),
+          t('xlsHrFinal'), t('xlsHrEstimated'), t('xlsStages'), t('xlsTotalReps'), t('xlsDistance'),
+        ]),
+        ...tests.map(test => [
+          this.date(this.dayOf(test.date)),
+          test.protocolLevel,
+          this.pv(test.pvCorrigido),
+          test.classification ?? t('xlsNoReferenceTable'),
+          test.fcFinal ?? null,
+          test.fcEstimada ?? null,
+          test.completedStages ?? null,
+          test.totalReps ?? null,
+          test.finalDistance ?? null,
+        ]),
+      ];
+      const sheet: Sheet<any> = {
+        data,
+        sheet: t('xlsSheetHistory'),
+        columns: [
+          { width: 12 }, { width: 8 }, { width: 18 }, { width: 22 },
+          { width: 14 }, { width: 18 }, { width: 10 }, { width: 13 }, { width: 14 },
+        ],
+      };
+      const context = [
+        athlete.sport ? t(`sport_${athlete.sport}`) : null,
+        athlete.position ? this.positionLabel(athlete.position, t) : null,
+        athlete.category,
+        athlete.team,
+        `${tests.length} ${t('xlsTestsCountLabel')}`,
+      ].filter(Boolean).join(' · ');
+      await this.write([sheet], { title: `${t('reportHistory')} · ${athlete.name}`, context }, t, fileName);
+    } catch (error) {
+      Logger.error('Erro ao gerar Excel do histórico:', error);
+      throw new Error('Não foi possível gerar o Excel.');
+    }
+  }
+
+  // ====================================================================
+  // Identidade T-CAR em cada aba
+  // ====================================================================
+
+  private async write(sheets: Sheet<any>[], info: DocInfo, t: T, fileName: string): Promise<void> {
+    const logo = await loadLogo();
+    const branded = sheets.map(sheet => this.brand(sheet, info, t, logo));
+    const { default: writeXlsxFile } = await import('write-excel-file/browser');
+    await writeXlsxFile(branded, { fontFamily: 'Calibri', fontSize: 11 }).toFile(fileName);
+  }
+
+  /**
+   * Monta a aba com a identidade do T-CAR. Recebe a aba "crua" (primeira
+   * linha = cabeçalho da tabela) e devolve com o bloco de abertura, a tabela
+   * estilizada e a assinatura no fim.
+   */
+  private brand(sheet: Sheet<any>, info: DocInfo, t: T, logo: Blob | null): Sheet<any> {
+    const [header, ...rows] = sheet.data;
+    const cols = header.length;
+    const widths = (sheet.columns ?? []).map(c => c.width ?? 10);
+
+    // O título começa na primeira coluna livre à direita da logo (~60 px; 1 caractere ≈ 7 px)
+    let titleCol = 0;
+    if (logo) {
+      let px = 0;
+      while (titleCol < cols - 1 && px < 60) {
+        px += (widths[titleCol] ?? 10) * 7 + 5;
+        titleCol++;
+      }
+    }
+    const span = Math.max(1, cols - titleCol);
+    const spanRow = (cell: Cell): Row => [
+      ...Array(titleCol).fill(null),
+      cell,
+      ...Array(span - 1).fill(null),
+    ];
+
+    const locale = t('dateLocale') || 'pt-BR';
+    const now = new Date();
+    const generatedAt = `${now.toLocaleDateString(locale)} ${now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`;
+    const subtitle = [t('docGeneratedAt', generatedAt), info.context].filter(Boolean).join(' · ');
+
+    const titleRow = spanRow({
+      value: info.title,
+      fontSize: 16,
+      fontWeight: 'bold',
+      textColor: BRAND.green,
+      alignVertical: 'bottom',
+      height: 30,
+      columnSpan: span,
+    });
+    const subtitleRow = spanRow({
+      value: subtitle,
+      fontSize: 9,
+      textColor: BRAND.muted,
+      alignVertical: 'top',
+      height: 22,
+      columnSpan: span,
+    });
+    // Faixa verde com ponta vermelha, como no PDF
+    const bandRow: Row = Array.from({ length: cols }, (_, i) => ({
+      value: '',
+      backgroundColor: i === cols - 1 ? BRAND.red : BRAND.green,
+      height: 4,
+    }));
+
+    const styledHeader: Row = header.map(cell => ({ ...this.asObject(cell), align: 'center', height: 30 }));
+
+    const styledRows: Row[] = rows.map((row, index) =>
+      row.map(cell => {
+        const obj = this.asObject(cell);
+        // Números e datas centralizados; texto à esquerda
+        const centered = typeof obj.value === 'number' || obj.value instanceof Date;
+        return {
+          ...obj,
+          ...(centered ? { align: 'center' } : {}),
+          ...(index % 2 === 1 ? { backgroundColor: BRAND.zebra } : {}),
+          bottomBorderColor: BRAND.border,
+          bottomBorderStyle: 'thin',
+          alignVertical: 'center',
+          height: 18,
+        };
+      })
+    );
+
+    const signatureRow: Row = [{
+      value: `${t('docGeneratedBy')} · ${BRAND.tagline}`,
+      fontSize: 9,
+      fontStyle: 'italic',
+      textColor: BRAND.muted,
+      columnSpan: cols,
+    }, ...Array(cols - 1).fill(null)];
+
+    return {
+      ...sheet,
+      data: [titleRow, subtitleRow, bandRow, styledHeader, ...styledRows, [], signatureRow],
+      stickyRowsCount: BRAND_ROWS + 1,
+      showGridLines: false,
+      images: logo ? [{
+        content: logo,
+        contentType: 'image/png',
+        width: LOGO_PX,
+        height: LOGO_PX,
+        // ~46 px na planilha
+        dpi: Math.round((LOGO_PX * 96) / 46),
+        anchor: { row: 1, column: 1 },
+        offsetX: 4,
+        offsetY: 4,
+        title: 'T-CAR',
+      }] : undefined,
+    };
+  }
+
+  /** Célula como objeto, para receber estilo sem perder valor/formato */
+  private asObject(cell: Cell): Record<string, any> {
+    if (cell === null || cell === undefined) return {};
+    if (typeof cell === 'object' && !(cell instanceof Date)) return { ...cell };
+    return { value: cell };
+  }
+
+  private periodText(report: MergedReport, t: T): string | null {
+    if (!report.period) return null;
+    const locale = t('dateLocale') || 'pt-BR';
+    const fmt = (day: string) => new Date(`${day}T12:00:00`).toLocaleDateString(locale);
+    const range = report.period.start === report.period.end
+      ? fmt(report.period.start)
+      : `${fmt(report.period.start)} - ${fmt(report.period.end)}`;
+    return `${t('period')} ${range}`;
+  }
+
+  /** Dia local de um timestamp (ou data pura) para a coluna de data */
+  private dayOf(date: string): string {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return date.slice(0, 10);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
   // ====================================================================
@@ -111,7 +336,6 @@ class ExcelExportServiceClass {
     return {
       data,
       sheet: t('xlsSheetRanking'),
-      stickyRowsCount: 1,
       columns: [
         ...(withGroup ? [{ width: 18 }] : []),
         ...(withLevel ? [{ width: 7 }] : []),
@@ -165,7 +389,6 @@ class ExcelExportServiceClass {
     return {
       data,
       sheet: t('xlsSheetDetail'),
-      stickyRowsCount: 1,
       columns: [
         { width: 22 }, { width: 12 }, { width: 8 }, { width: 9 }, { width: 7 },
         { width: 28 }, { width: 18 }, { width: 13 }, { width: 11 }, { width: 12 }, { width: 18 },
@@ -207,7 +430,6 @@ class ExcelExportServiceClass {
     return {
       data,
       sheet: t('xlsSheetComparison'),
-      stickyRowsCount: 1,
       stickyColumnsCount: 1 + (withGroup ? 1 : 0) + (withLevel ? 1 : 0),
       columns: [
         ...(withGroup ? [{ width: 18 }] : []),
@@ -244,7 +466,6 @@ class ExcelExportServiceClass {
     return {
       data,
       sheet: t('xlsSheetBatteries'),
-      stickyRowsCount: 1,
       columns: [
         { width: 22 }, { width: 12 }, { width: 8 }, { width: 9 }, { width: 7 },
         { width: 10 }, { width: 12 }, { width: 16 }, { width: 40 },

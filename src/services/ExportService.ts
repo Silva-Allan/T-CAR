@@ -1,13 +1,15 @@
 // ======================================================================
-// T-CAR 2.0 — Export Service (Design Aprimorado)
+// T-CAR 2.1 — Export Service (PDF)
 // ======================================================================
-// Exportação de dados em PDF profissional com layout modernizado.
-// Destaque para: T-CAR, nome do atleta, clube/equipe e data do PDF.
+// Relatórios em PDF com a identidade do T-CAR: logo oficial no cabeçalho,
+// verde e vermelho da logo, e rodapé informando que o documento foi
+// gerado pelo aplicativo T-CAR.
 // ======================================================================
 
 import type { MergedReport, ReportSection } from '@/services/MergeService';
 import { ordinal } from '@/lib/utils';
 import { Logger } from '@/utils/Logger';
+import { BRAND, loadLogoDataUrl } from '@/services/BrandService';
 
 // Cores UDESC (mantidas)
 const UDESC_GREEN = [0, 102, 51] as const;       // #006633
@@ -22,6 +24,12 @@ const TABLE_BORDER = [200, 210, 200] as const;
 const BG_LIGHT = [248, 250, 248] as const;
 
 class ExportServiceClass {
+    /** Logo oficial carregada no início de cada exportação (null = sai só o texto) */
+    private logoDataUrl: string | null = null;
+
+    private async prepareBrand(): Promise<void> {
+        this.logoDataUrl = await loadLogoDataUrl();
+    }
 
     // ====================================================================
     // PDF Helpers — Design Aprimorado
@@ -29,7 +37,7 @@ class ExportServiceClass {
 
     private drawEnhancedHeader(doc: any, title: string, lang: string, athleteName?: string, team?: string): number {
         const pageW = doc.internal.pageSize.getWidth();
-        const headerHeight = 50;
+        const headerHeight = 46;
         const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
         const currentDate = new Date().toLocaleDateString(locale, {
             day: '2-digit',
@@ -37,66 +45,64 @@ class ExportServiceClass {
             year: 'numeric'
         });
 
-        // Fundo principal com gradiente visual (faixas)
+        // Faixa verde com borda superior mais escura
         doc.setFillColor(...UDESC_GREEN);
         doc.rect(0, 0, pageW, headerHeight, 'F');
-
-        // Faixa superior mais escura
         doc.setFillColor(...UDESC_DARK);
-        doc.rect(0, 0, pageW, 6, 'F');
+        doc.rect(0, 0, pageW, 4, 'F');
 
-        // LOGOTIPO T-CAR (esquerda)
-        doc.setFontSize(28);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...TEXT_LIGHT);
-        doc.text('T-CAR', 15, 22);
+        // Filete vermelho da logo fechando o cabeçalho
+        doc.setFillColor(...ACCENT_RED);
+        doc.rect(0, headerHeight, pageW, 1.2, 'F');
 
-        // Slogan ou versão (pequeno abaixo do logo)
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(200, 230, 200);
-        doc.text('T-CAR App • UDESC', 15, 32);
-
-        // NOME DO ATLETA (centralizado, destaque)
-        if (athleteName) {
-            doc.setFontSize(18);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(...TEXT_LIGHT);
-
-            // Centraliza o nome do atleta
-            const nameWidth = doc.getTextWidth(athleteName);
-            const centerX = (pageW - nameWidth) / 2;
-            doc.text(athleteName, centerX, 22);
-
-            // CLUBE/EQUIPE abaixo do nome do atleta
-            if (team) {
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(220, 240, 220);
-                const teamWidth = doc.getTextWidth(team);
-                const teamCenterX = (pageW - teamWidth) / 2;
-                doc.text(team, teamCenterX, 35);
+        // Selo branco com a logo oficial
+        const cx = 31;
+        const cy = 25;
+        doc.setFillColor(255, 255, 255);
+        doc.circle(cx, cy, 17, 'F');
+        let logoDrawn = false;
+        if (this.logoDataUrl) {
+            try {
+                doc.addImage(this.logoDataUrl, 'PNG', cx - 15, cy - 15, 30, 30);
+                logoDrawn = true;
+            } catch {
+                logoDrawn = false;
             }
         }
+        if (!logoDrawn) {
+            doc.setFontSize(13);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...UDESC_GREEN);
+            doc.text('T-CAR', cx, cy + 2, { align: 'center' });
+        }
 
-        // DATA DO PDF (direita)
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...TEXT_LIGHT);
-        doc.text(currentDate, pageW - 15, 18, { align: 'right' });
+        // Centro: nome do atleta/avaliação e equipe
+        const centerX = pageW / 2 + 4;
+        const centerMaxW = pageW - 2 * 64;
+        if (athleteName) {
+            doc.setFontSize(17);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...TEXT_LIGHT);
+            doc.text(doc.splitTextToSize(athleteName, centerMaxW)[0], centerX, team ? 22 : 26, { align: 'center' });
+        }
+        if (team) {
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(220, 240, 220);
+            doc.text(doc.splitTextToSize(team, centerMaxW)[0], centerX, athleteName ? 30 : 26, { align: 'center' });
+        }
 
-        // Título do relatório (abaixo da data)
+        // Direita: tipo de relatório e data
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...TEXT_LIGHT);
+        doc.text(title, pageW - 15, 21, { align: 'right' });
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
         doc.setTextColor(220, 240, 220);
-        doc.text(title, pageW - 15, 32, { align: 'right' });
+        doc.text(currentDate, pageW - 15, 28, { align: 'right' });
 
-        // Linha decorativa inferior (ajustada para evitar setGlobalAlpha que quebra em algumas versões)
-        doc.setDrawColor(180, 220, 180); // Verde claro para simular transparência sobre o fundo verde
-        doc.setLineWidth(0.3);
-        doc.line(15, headerHeight - 8, pageW - 15, headerHeight - 8);
-
-        return headerHeight + 10; // Y position after header
+        return headerHeight + 13; // Y position after header
     }
 
     private drawModernInfoBox(doc: any, y: number, items: { label: string; value: string }[], columns = 3): number {
@@ -364,27 +370,27 @@ class ExportServiceClass {
             doc.setPage(i);
             const pageW = doc.internal.pageSize.getWidth();
 
-            // Linha decorativa
-            doc.setDrawColor(...TABLE_BORDER);
-            doc.setLineWidth(0.3);
-            doc.line(15, 280, pageW - 15, 280);
+            // Filete verde com ponta vermelha
+            doc.setFillColor(...UDESC_GREEN);
+            doc.rect(15, 279.4, pageW - 30, 0.6, 'F');
+            doc.setFillColor(...ACCENT_RED);
+            doc.rect(pageW - 35, 279.4, 20, 0.6, 'F');
 
-            // Logo texto
-            doc.setFontSize(7);
+            // Assinatura: produzido pelo aplicativo T-CAR
+            doc.setFontSize(7.5);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(...UDESC_GREEN);
-            doc.text('T-CAR', 15, 287);
-
-            // Info central
+            doc.text(t('docGeneratedBy'), 15, 285.5);
+            doc.setFontSize(6.5);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(...TEXT_SECONDARY);
-            doc.text('T-CAR App - UDESC - Test de Course avec Acceleration et Recuperation', 15, 292);
+            doc.text(`T-CAR · ${BRAND.tagline} · UDESC`, 15, 290);
 
-            // Data e página
-            doc.setFont('helvetica', 'normal');
+            // Página, hora e data
+            doc.setFontSize(7);
             doc.text(
                 `${t('page')} ${i}/${pageCount}  |  ${currentTime}  |  ${currentDate}`,
-                pageW - 15, 287, { align: 'right' }
+                pageW - 15, 285.5, { align: 'right' }
             );
         }
     }
@@ -415,6 +421,7 @@ class ExportServiceClass {
         }
     ): Promise<void> {
         try {
+            await this.prepareBrand();
             const { default: jsPDF } = await import('jspdf');
             const doc = new jsPDF();
 
@@ -553,6 +560,7 @@ class ExportServiceClass {
         options?: { chartImage?: string | null; totalTests?: number; team?: string | null }
     ): Promise<void> {
         try {
+            await this.prepareBrand();
             const { default: jsPDF } = await import('jspdf');
             const doc = new jsPDF();
             const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';
@@ -633,6 +641,7 @@ class ExportServiceClass {
         options: { title?: string | null; team?: string | null; fileName: string; kind?: 'battery' | 'merged' }
     ): Promise<void> {
         try {
+            await this.prepareBrand();
             const { default: jsPDF } = await import('jspdf');
             const doc = new jsPDF();
             const locale = lang === 'en' ? 'en-US' : lang === 'es' ? 'es-ES' : 'pt-BR';

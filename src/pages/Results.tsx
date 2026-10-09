@@ -281,7 +281,7 @@ export default function Results() {
 
   const handleExportExcel = async () => {
     try {
-      await ExcelExportService.exportReport(report, t, `tcar_teste_${reportTest.day}.xlsx`);
+      await ExcelExportService.exportReport(report, t, `tcar_teste_${reportTest.day}.xlsx`, { kind: 'battery' });
     } catch (error) {
       toast({ variant: 'destructive', title: t('excelExportError') });
     }

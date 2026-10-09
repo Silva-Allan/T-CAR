@@ -109,7 +109,9 @@ export default function GroupDashboard() {
                 lastPV: r.lastPV,
                 testCount: r.testCount,
             }));
-            await ExcelExportService.exportGroupRanking(excelRanking, t, `tcar_ranking_${new Date().toISOString().split('T')[0]}.xlsx`);
+            await ExcelExportService.exportGroupRanking(excelRanking, t, `tcar_ranking_${new Date().toISOString().split('T')[0]}.xlsx`, {
+                team: trainerProfile?.club || null,
+            });
         } catch (error) {
             Logger.error('Error exporting Excel:', error);
         }

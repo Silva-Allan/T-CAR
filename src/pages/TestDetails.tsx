@@ -84,7 +84,7 @@ export default function TestDetails() {
     if (!test || !report) return;
     setExportingExcel(true);
     try {
-      await ExcelExportService.exportReport(report, t, `tcar_teste_${test.day}.xlsx`);
+      await ExcelExportService.exportReport(report, t, `tcar_teste_${test.day}.xlsx`, { kind: 'battery' });
     } catch (error) {
       Logger.error('Erro ao exportar Excel:', error);
     } finally {

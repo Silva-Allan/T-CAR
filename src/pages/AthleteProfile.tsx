@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   User, TrendingUp, TrendingDown, Minus, Calendar, Trophy, Loader2,
-  Download, Heart, Activity, ChevronDown
+  Download, Heart, Activity, ChevronDown, FileSpreadsheet
 } from 'lucide-react';
 import { Logger } from '@/utils/Logger';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -11,6 +11,7 @@ import { StatCard } from '@/components/test/StatCard';
 import { SupabaseService } from '@/services/SupabaseService';
 import { ClassificationService } from '@/services/ClassificationService';
 import { ExportService } from '@/services/ExportService';
+import { ExcelExportService } from '@/services/ExcelExportService';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { calculateAge, calculateCategory, normalizeSport } from '@/models/types';
@@ -248,34 +249,37 @@ export default function AthleteProfile() {
     }
   };
 
-  const handleExportJson = () => {
+  const handleExportExcel = async () => {
     if (!athlete || tests.length === 0) return;
-    const data = {
-      athlete: {
-        name: athlete.name,
-        team: athlete.team,
-        position: athlete.position,
-        birth_date: athlete.birth_date,
-        gender: athlete.gender,
-      },
-      history: tests.map(t => ({
-        date: t.test.date,
-        protocol: t.test.protocol_level,
-        pv_corrigido: Number(t.pv_corrigido),
-        pv_bruto: Number(t.pv_bruto),
-        fc_final: t.fc_final,
-        fc_estimada: t.fc_estimada,
-        distancia: t.final_distance,
-        repeticoes: t.total_reps
-      }))
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tcar-atleta-${athlete.name.toLowerCase().replace(/\s+/g, '-')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      await ExcelExportService.exportAthleteHistory(
+        {
+          name: athlete.name,
+          team: athlete.team,
+          category: athlete.birth_date ? calculateCategory(athlete.birth_date) : null,
+          sport: normalizeSport((athlete as any).sport),
+          position: athlete.position,
+        },
+        tests.map(test => {
+          const cl = ClassificationService.classify(Number(test.pv_corrigido), athlete);
+          return {
+            date: test.test.date,
+            protocolLevel: test.test.protocol_level,
+            pvCorrigido: Number(test.pv_corrigido),
+            classification: cl ? t(cl.label as any) : null,
+            fcFinal: test.fc_final,
+            fcEstimada: test.fc_estimada,
+            completedStages: test.completed_stages,
+            totalReps: test.total_reps,
+            finalDistance: Number(test.final_distance),
+          };
+        }),
+        t,
+        `tcar_historico_${athlete.name.toLowerCase().replace(/\s+/g, '_')}.xlsx`
+      );
+    } catch (error) {
+      Logger.error('Erro ao exportar Excel:', error);
+    }
   };
 
   if (loading) {
@@ -472,9 +476,9 @@ export default function AthleteProfile() {
             </h3>
             {tests.length > 0 && (
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={handleExportJson} className="text-[10px] h-8">
-                  <Download className="w-3.5 h-3.5 mr-1 text-primary" />
-                  JSON
+                <Button variant="ghost" size="sm" onClick={handleExportExcel} className="text-[10px] h-8">
+                  <FileSpreadsheet className="w-3.5 h-3.5 mr-1 text-primary" />
+                  Excel
                 </Button>
                 <Button variant="ghost" size="sm" onClick={handleExportHistory} className="text-[10px] h-8">
                   <Download className="w-3.5 h-3.5 mr-1" />
