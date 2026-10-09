@@ -10,7 +10,7 @@
 // Não depende de UI nem de Supabase — recebe dados normalizados.
 // ======================================================================
 
-import { Athlete, AthleteResult, PVClassification, Sport, calculateCategory, normalizeSport } from '@/models/types';
+import { Athlete, AthleteResult, PVClassification, SPORTS, Sport, calculateCategory, normalizeSport } from '@/models/types';
 import { ClassificationService, RANKING_GROUPS, RankingGroup } from '@/services/ClassificationService';
 
 export interface ReportResult {
@@ -138,6 +138,7 @@ export interface MergedReport {
 export interface ReportFilters {
   team?: string | null;
   category?: string | null;
+  sport?: Sport | null;
 }
 
 const pad = (n: number) => n.toString().padStart(2, '0');
@@ -268,29 +269,33 @@ class MergeServiceClass {
   }
 
   /** Valores distintos de equipe e categoria, para montar os filtros */
-  filterOptions(tests: ReportTest[]): { teams: string[]; categories: string[] } {
+  filterOptions(tests: ReportTest[]): { teams: string[]; categories: string[]; sports: Sport[] } {
     const teams = new Set<string>();
     const categories = new Set<string>();
+    const sports = new Set<Sport>();
     for (const test of tests) {
       for (const r of test.results) {
         if (r.team) teams.add(r.team);
         if (r.category) categories.add(r.category);
+        sports.add(r.sport);
       }
     }
     return {
       teams: Array.from(teams).sort((a, b) => a.localeCompare(b)),
       categories: Array.from(categories).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+      sports: SPORTS.filter(s => sports.has(s)),
     };
   }
 
   applyFilters(tests: ReportTest[], filters: ReportFilters): ReportTest[] {
-    if (!filters.team && !filters.category) return tests;
+    if (!filters.team && !filters.category && !filters.sport) return tests;
     return tests
       .map(test => ({
         ...test,
         results: test.results.filter(r =>
           (!filters.team || r.team === filters.team) &&
-          (!filters.category || r.category === filters.category)
+          (!filters.category || r.category === filters.category) &&
+          (!filters.sport || r.sport === filters.sport)
         ),
       }))
       .filter(test => test.results.length > 0);

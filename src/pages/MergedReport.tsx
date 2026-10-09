@@ -27,6 +27,7 @@ import { CalculatorService } from '@/services/CalculatorService';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useToast } from '@/hooks/use-toast';
 import { cn, ordinal } from '@/lib/utils';
+import type { Sport } from '@/models/types';
 import { Logger } from '@/utils/Logger';
 
 const ALL = '__all__';
@@ -61,6 +62,7 @@ export default function MergedReport() {
 
   const [teamFilter, setTeamFilter] = useState(ALL);
   const [categoryFilter, setCategoryFilter] = useState(ALL);
+  const [sportFilter, setSportFilter] = useState(ALL);
   const [exporting, setExporting] = useState<'xlsx' | 'pdf' | null>(null);
 
   const [saveOpen, setSaveOpen] = useState(false);
@@ -126,9 +128,10 @@ export default function MergedReport() {
     const filtered = MergeService.applyFilters(tests, {
       team: teamFilter === ALL ? null : teamFilter,
       category: categoryFilter === ALL ? null : categoryFilter,
+      sport: sportFilter === ALL ? null : (sportFilter as Sport),
     });
     return MergeService.merge(filtered, groupInputs);
-  }, [tests, groupInputs, teamFilter, categoryFilter]);
+  }, [tests, groupInputs, teamFilter, categoryFilter, sportFilter]);
 
   const title = singleEvaluation?.name ?? null;
 
@@ -141,6 +144,7 @@ export default function MergedReport() {
     }
     if (teamFilter !== ALL) parts.push(fileSlug(teamFilter));
     if (categoryFilter !== ALL) parts.push(fileSlug(categoryFilter));
+    if (sportFilter !== ALL) parts.push(fileSlug(t(`sport_${sportFilter}` as any)));
     return `tcar_${parts.join('_')}`;
   };
 
@@ -340,8 +344,22 @@ export default function MergedReport() {
         )}
 
         {/* Filtros */}
-        {(filterOptions.teams.length > 1 || filterOptions.categories.length > 1) && (
-          <div className="grid grid-cols-2 gap-3">
+        {(filterOptions.teams.length > 1 || filterOptions.categories.length > 1 || filterOptions.sports.length > 1) && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {filterOptions.sports.length > 1 && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('sport')}</Label>
+                <Select value={sportFilter} onValueChange={setSportFilter}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>{t('mergedAll')}</SelectItem>
+                    {filterOptions.sports.map(sport => (
+                      <SelectItem key={sport} value={sport}>{t(`sport_${sport}` as any)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">{t('team')}</Label>
               <Select value={teamFilter} onValueChange={setTeamFilter}>
