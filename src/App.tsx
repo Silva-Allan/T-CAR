@@ -23,6 +23,7 @@ import About from "./pages/About";
 import GroupDashboard from "./pages/GroupDashboard";
 import MergedReport from "./pages/MergedReport";
 import Evaluations from "./pages/Evaluations";
+import ReportBuilder from "./pages/ReportBuilder";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfUse from "./pages/TermsOfUse";
 import NotFound from "./pages/NotFound";
@@ -57,6 +58,7 @@ const App = () => (
               <Route path="/group" element={<ProtectedRoute><GroupDashboard /></ProtectedRoute>} />
               <Route path="/evaluations" element={<ProtectedRoute><Evaluations /></ProtectedRoute>} />
               <Route path="/reports/merged" element={<ProtectedRoute><MergedReport /></ProtectedRoute>} />
+              <Route path="/reports/new" element={<ProtectedRoute><ReportBuilder /></ProtectedRoute>} />
 
               <Route path="/about" element={<About />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />

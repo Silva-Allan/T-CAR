@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { StatCard } from '@/components/test/StatCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ReportFiltersBar } from '@/components/ReportFiltersBar';
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -20,37 +20,34 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { SupabaseService, EvaluationWithTests } from '@/services/SupabaseService';
-import { MergeService, ReportGroupInput, ReportSection, ReportTest } from '@/services/MergeService';
+import { MergeService, ReportFilters, ReportGroupInput, ReportSection, ReportTest } from '@/services/MergeService';
 import { ExcelExportService } from '@/services/ExcelExportService';
 import { ExportService } from '@/services/ExportService';
 import { CalculatorService } from '@/services/CalculatorService';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useToast } from '@/hooks/use-toast';
-import { cn, ordinal } from '@/lib/utils';
-import type { Sport } from '@/models/types';
+import { cn, fileSlug, ordinal } from '@/lib/utils';
+import {
+  describeFilters, filtersFromJson, filtersFromParams, filtersToJson, writeFiltersToParams,
+} from '@/lib/reportFilters';
 import { Logger } from '@/utils/Logger';
-
-const ALL = '__all__';
-
-/** Nome de arquivo seguro: sem acentos, espaços ou caracteres especiais */
-function fileSlug(text: string): string {
-  return text
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .toLowerCase()
-    .substring(0, 60) || 'avaliacao';
-}
 
 export default function MergedReport() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t, lang } = useTranslation();
   const { toast } = useToast();
 
   const testIdsParam = searchParams.get('tests');
   const evaluationIdsParam = searchParams.get('evaluations');
+  // Relatório gerado por período + filtros (tela "Gerar relatório")
+  const fromParam = searchParams.get('from');
+  const toParam = searchParams.get('to');
+
+  // O recorte vive na URL: voltar ou recarregar mantém os filtros
+  const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
+  const setFilters = (next: ReportFilters) =>
+    setSearchParams(writeFiltersToParams(searchParams, next), { replace: true });
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -60,9 +57,6 @@ export default function MergedReport() {
   const [missingCount, setMissingCount] = useState(0);
   const [trainerProfile, setTrainerProfile] = useState<any>(null);
 
-  const [teamFilter, setTeamFilter] = useState(ALL);
-  const [categoryFilter, setCategoryFilter] = useState(ALL);
-  const [sportFilter, setSportFilter] = useState(ALL);
   const [exporting, setExporting] = useState<'xlsx' | 'pdf' | null>(null);
 
   const [saveOpen, setSaveOpen] = useState(false);
@@ -95,11 +89,19 @@ export default function MergedReport() {
           const rows = await SupabaseService.getTestsForReport(testIds);
           setEvaluations(evals);
           setTests(rows.map(r => MergeService.fromSupabase(r)));
+          // Avaliação aberta sozinha: o recorte salvo vira o filtro da tela (pode ser trocado).
+          // Comparando várias: cada uma mantém o próprio recorte.
+          const single = evals.length === 1;
           setGroupInputs(evals.map(e => ({
             key: e.id,
             label: e.name,
             testIds: e.evaluation_tests.map(et => et.test_id),
+            filters: single ? null : filtersFromJson(e.filters),
           })));
+          const saved = single ? filtersFromJson(evals[0].filters) : null;
+          if (saved && !MergeService.hasFilters(filtersFromParams(searchParams))) {
+            setSearchParams(writeFiltersToParams(searchParams, saved), { replace: true });
+          }
           setMissingCount(ids.length - evals.length);
         } else if (testIdsParam) {
           const ids = testIdsParam.split(',').filter(Boolean);
@@ -109,6 +111,19 @@ export default function MergedReport() {
           setTests(normalized);
           setGroupInputs(MergeService.groupByDay(normalized, formatDay));
           setMissingCount(ids.length - normalized.length);
+        } else if (fromParam && toParam) {
+          // Período em dias locais: [from 00:00, to + 1 dia 00:00)
+          const [fy, fm, fd] = fromParam.split('-').map(Number);
+          const [ty, tm, td] = toParam.split('-').map(Number);
+          const rows = await SupabaseService.getTestsForReportInRange(
+            new Date(fy, fm - 1, fd).toISOString(),
+            new Date(ty, tm - 1, td + 1).toISOString()
+          );
+          const normalized = rows.map(r => MergeService.fromSupabase(r));
+          setEvaluations([]);
+          setTests(normalized);
+          setGroupInputs(MergeService.groupByDay(normalized, formatDay));
+          setMissingCount(0);
         }
       } catch (error) {
         Logger.error('Erro ao carregar relatório unificado:', error);
@@ -120,38 +135,40 @@ export default function MergedReport() {
     load();
     // formatDay depende só do idioma
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [testIdsParam, evaluationIdsParam, lang]);
+  }, [testIdsParam, evaluationIdsParam, fromParam, toParam, lang]);
 
   const filterOptions = useMemo(() => MergeService.filterOptions(tests), [tests]);
 
-  const report = useMemo(() => {
-    const filtered = MergeService.applyFilters(tests, {
-      team: teamFilter === ALL ? null : teamFilter,
-      category: categoryFilter === ALL ? null : categoryFilter,
-      sport: sportFilter === ALL ? null : (sportFilter as Sport),
-    });
-    return MergeService.merge(filtered, groupInputs);
-  }, [tests, groupInputs, teamFilter, categoryFilter, sportFilter]);
+  const report = useMemo(
+    () => MergeService.merge(MergeService.applyFilters(tests, filters), groupInputs),
+    [tests, groupInputs, filters]
+  );
 
+  const filtersText = describeFilters(filters, t);
   const title = singleEvaluation?.name ?? null;
+  // Título dos documentos: nome da avaliação ou, sem ele, o próprio recorte
+  const docTitle = title ?? filtersText;
+
+  // Recorte da tela diferente do salvo na avaliação → oferece salvar
+  const savedFilters = singleEvaluation ? filtersFromJson(singleEvaluation.filters) : null;
+  const filtersChanged = !!singleEvaluation &&
+    JSON.stringify(filtersToJson(filters)) !== JSON.stringify(savedFilters ? filtersToJson(savedFilters) : null);
 
   const fileBase = () => {
-    const parts = [title ? fileSlug(title) : 'avaliacao'];
+    const parts = [(title && fileSlug(title)) || 'avaliacao'];
     if (report.period) {
       parts.push(report.period.start === report.period.end
         ? report.period.start
         : `${report.period.start}_a_${report.period.end}`);
     }
-    if (teamFilter !== ALL) parts.push(fileSlug(teamFilter));
-    if (categoryFilter !== ALL) parts.push(fileSlug(categoryFilter));
-    if (sportFilter !== ALL) parts.push(fileSlug(t(`sport_${sportFilter}` as any)));
+    if (filtersText) parts.push(fileSlug(filtersText));
     return `tcar_${parts.join('_')}`;
   };
 
   const handleExportExcel = async () => {
     setExporting('xlsx');
     try {
-      await ExcelExportService.exportReport(report, t, `${fileBase()}.xlsx`, { title, kind: 'merged' });
+      await ExcelExportService.exportReport(report, t, `${fileBase()}.xlsx`, { title: docTitle, kind: 'merged', filtersText });
     } catch {
       toast({ variant: 'destructive', title: t('excelExportError') });
     } finally {
@@ -163,9 +180,10 @@ export default function MergedReport() {
     setExporting('pdf');
     try {
       await ExportService.exportMergedReportToPDF(report, t, lang, {
-        title,
+        title: docTitle,
         team: trainerProfile?.club || null,
         fileName: `${fileBase()}.pdf`,
+        filtersText,
       });
     } catch {
       toast({ variant: 'destructive', title: t('pdfExportError') });
@@ -182,7 +200,7 @@ export default function MergedReport() {
         ? formatDay(report.period.start)
         : `${formatDay(report.period.start)} - ${formatDay(report.period.end)}`)
       : '';
-    setFormName(`${t('evaluationDefaultName')} ${period}`.trim());
+    setFormName([filtersText ?? t('evaluationDefaultName'), period].filter(Boolean).join(' · '));
     setFormNotes('');
     setSaveOpen(true);
   };
@@ -192,7 +210,9 @@ export default function MergedReport() {
     if (!name) return;
     setSavingEvaluation(true);
     try {
-      const evaluation = await SupabaseService.createEvaluation(name, formNotes.trim() || null, tests.map(t => t.id));
+      // Só as baterias com algum atleta do recorte; o recorte vai junto
+      const testIds = report.batteries.map(b => b.testId);
+      const evaluation = await SupabaseService.createEvaluation(name, formNotes.trim() || null, testIds, filtersToJson(filters));
       setSaveOpen(false);
       toast({ title: t('evaluationSaved') });
       navigate(`/reports/merged?evaluations=${evaluation.id}`, { replace: true });
@@ -228,6 +248,21 @@ export default function MergedReport() {
     }
   };
 
+  const handleSaveFilters = async () => {
+    if (!singleEvaluation) return;
+    setSavingEvaluation(true);
+    try {
+      const json = filtersToJson(filters);
+      await SupabaseService.updateEvaluation(singleEvaluation.id, { filters: json });
+      setEvaluations([{ ...singleEvaluation, filters: json }]);
+      toast({ title: t('filtersSaved') });
+    } catch {
+      toast({ variant: 'destructive', title: t('evaluationSaveError') });
+    } finally {
+      setSavingEvaluation(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!singleEvaluation) return;
     try {
@@ -241,7 +276,11 @@ export default function MergedReport() {
 
   // ── Render ─────────────────────────────────────────────────────────
 
-  const backTo = evaluationIdsParam ? '/evaluations' : '/history';
+  const backTo = evaluationIdsParam
+    ? '/evaluations'
+    : fromParam
+      ? `/reports/new?${searchParams.toString()}`
+      : '/history';
 
   if (loading) {
     return (
@@ -289,8 +328,11 @@ export default function MergedReport() {
             <Layers className="w-7 h-7 text-primary" />
           </div>
           <h2 className="text-lg font-semibold break-words">
-            {title ?? (multiGroup ? t('mergedComparisonOf', report.groups.length) : t('mergedSingleDay'))}
+            {title ?? filtersText ?? (multiGroup ? t('mergedComparisonOf', report.groups.length) : t('mergedSingleDay'))}
           </h2>
+          {title && filtersText && (
+            <p className="text-sm text-primary font-medium mt-1">{filtersText}</p>
+          )}
           <p className="text-sm text-muted-foreground flex items-center justify-center gap-1 mt-1">
             <Calendar className="w-4 h-4" />
             {periodText}
@@ -312,6 +354,12 @@ export default function MergedReport() {
               <Button size="sm" onClick={openSaveDialog} className="gap-2">
                 <BookmarkPlus className="w-4 h-4" />
                 {t('saveEvaluation')}
+              </Button>
+            )}
+            {filtersChanged && (
+              <Button size="sm" onClick={handleSaveFilters} disabled={savingEvaluation} className="gap-2">
+                <BookmarkPlus className="w-4 h-4" />
+                {t('saveFilters')}
               </Button>
             )}
             {singleEvaluation && (
@@ -344,48 +392,7 @@ export default function MergedReport() {
         )}
 
         {/* Filtros */}
-        {(filterOptions.teams.length > 1 || filterOptions.categories.length > 1 || filterOptions.sports.length > 1) && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {filterOptions.sports.length > 1 && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{t('sport')}</Label>
-                <Select value={sportFilter} onValueChange={setSportFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ALL}>{t('mergedAll')}</SelectItem>
-                    {filterOptions.sports.map(sport => (
-                      <SelectItem key={sport} value={sport}>{t(`sport_${sport}` as any)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t('team')}</Label>
-              <Select value={teamFilter} onValueChange={setTeamFilter}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>{t('mergedAll')}</SelectItem>
-                  {filterOptions.teams.map(team => (
-                    <SelectItem key={team} value={team}>{team}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">{t('xlsCategory')}</Label>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL}>{t('mergedAll')}</SelectItem>
-                  {filterOptions.categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
+        <ReportFiltersBar options={filterOptions} value={filters} onChange={setFilters} t={t} idPrefix="merged" />
 
         {/* Resumo */}
         <div className="grid grid-cols-2 gap-3">

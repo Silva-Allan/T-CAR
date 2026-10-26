@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Calendar, Check, ChevronRight, GitCompare, Layers, Loader2, X } from 'lucide-react';
+import { AlertTriangle, Calendar, Check, ChevronRight, FileBarChart, GitCompare, Layers, Loader2, X } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { SupabaseService, EvaluationWithTests } from '@/services/SupabaseService';
 import { MergeService } from '@/services/MergeService';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
+import { describeFilters, filtersFromJson } from '@/lib/reportFilters';
 import { Logger } from '@/utils/Logger';
 
 export default function Evaluations() {
@@ -85,7 +86,13 @@ export default function Evaluations() {
         )
       }
     >
-      <div className={cn('max-w-md mx-auto', selecting && 'pb-24')}>
+      <div className={cn('max-w-md mx-auto space-y-4', selecting && 'pb-24')}>
+        {!selecting && (
+          <Button variant="outline" className="w-full justify-start gap-2" onClick={() => navigate('/reports/new')}>
+            <FileBarChart className="w-4 h-4 text-primary" />
+            {t('generateReportByFilters')}
+          </Button>
+        )}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -134,6 +141,11 @@ export default function Evaluations() {
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold truncate">{evaluation.name}</p>
+                    {describeFilters(filtersFromJson(evaluation.filters), t) && (
+                      <p className="text-xs text-primary font-medium truncate">
+                        {describeFilters(filtersFromJson(evaluation.filters), t)}
+                      </p>
+                    )}
                     <p className="text-sm text-muted-foreground flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5" />
                       {periodOf(evaluation)}

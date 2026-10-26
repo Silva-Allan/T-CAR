@@ -266,6 +266,30 @@ class SupabaseServiceClass {
     return data || [];
   }
 
+  /**
+   * Testes de um período [startISO, endISO) já com os dados dos atletas,
+   * para a tela "Gerar relatório". Os filtros são aplicados no app porque a
+   * categoria depende da data de cada teste.
+   */
+  async getTestsForReportInRange(startISO: string, endISO: string): Promise<any[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('AUTH_ERROR');
+
+    const { data, error } = await supabase
+      .from('tests')
+      .select('*, test_results(*, athletes(team, birth_date, position, sport, gender))')
+      .eq('user_id', user.id)
+      .gte('date', startISO)
+      .lt('date', endISO)
+      .order('date', { ascending: true });
+
+    if (error) {
+      Logger.error('Erro ao buscar testes do período:', error.message);
+      throw error;
+    }
+    return data || [];
+  }
+
   /** Testes num intervalo [startISO, endISO) — usado pelo filtro de dia do Histórico */
   async getTestsInRange(startISO: string, endISO: string): Promise<any[]> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -389,13 +413,18 @@ class SupabaseServiceClass {
     return (data || []) as unknown as EvaluationWithTests[];
   }
 
-  async createEvaluation(name: string, notes: string | null, testIds: string[]): Promise<EvaluationRow> {
+  async createEvaluation(
+    name: string,
+    notes: string | null,
+    testIds: string[],
+    filters: Record<string, string> | null = null
+  ): Promise<EvaluationRow> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('AUTH_ERROR');
 
     const { data: evaluation, error } = await supabase
       .from('evaluations')
-      .insert({ name, notes, user_id: user.id })
+      .insert({ name, notes, filters, user_id: user.id })
       .select()
       .single();
 
@@ -418,7 +447,10 @@ class SupabaseServiceClass {
     return evaluation;
   }
 
-  async updateEvaluation(id: string, updates: { name?: string; notes?: string | null }): Promise<void> {
+  async updateEvaluation(
+    id: string,
+    updates: { name?: string; notes?: string | null; filters?: Record<string, string> | null }
+  ): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('AUTH_ERROR');
 

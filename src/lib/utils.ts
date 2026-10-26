@@ -12,3 +12,14 @@ export function ordinal(n: number, lang: string): string {
   if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
   return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
 }
+
+/** Trecho seguro para nome de arquivo: sem acentos, espaços ou símbolos */
+export function fileSlug(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()
+    .substring(0, 60);
+}

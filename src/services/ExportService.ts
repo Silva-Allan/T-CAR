@@ -638,7 +638,14 @@ class ExportServiceClass {
         report: MergedReport,
         t: any,
         lang: string,
-        options: { title?: string | null; team?: string | null; fileName: string; kind?: 'battery' | 'merged' }
+        options: {
+            title?: string | null;
+            team?: string | null;
+            fileName: string;
+            kind?: 'battery' | 'merged';
+            /** Recorte aplicado, ex.: "Futebol · Sub-15 · Feminino" */
+            filtersText?: string | null;
+        }
     ): Promise<void> {
         try {
             await this.prepareBrand();
@@ -688,6 +695,23 @@ class ExportServiceClass {
                     { label: t('athletesLabel'), value: `${report.stats.athletes}` },
                     { label: t('protocolLabel') + ':', value: `${t('level')} ${levels}` },
                 ], 3);
+            }
+
+            // Recorte aplicado: deixa claro que o documento não traz o grupo inteiro
+            if (options.filtersText) {
+                const pageW = doc.internal.pageSize.getWidth();
+                doc.setFillColor(232, 242, 236);
+                doc.roundedRect(15, y - 4, pageW - 30, 11, 3, 3, 'F');
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...UDESC_GREEN);
+                const label = t('filtersLabel');
+                doc.text(label, 20, y + 3);
+                const valueX = 20 + doc.getTextWidth(label) + 2;
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...TEXT_PRIMARY);
+                doc.text(doc.splitTextToSize(options.filtersText, pageW - 35 - valueX)[0], valueX, y + 3);
+                y += 15;
             }
 
             y = this.drawMetricCard(doc, y, [

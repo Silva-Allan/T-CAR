@@ -166,7 +166,7 @@ export default function AthleteProfile() {
   const lastTest = tests[0];
   // null quando o atleta não tem tabela de referência (handebol, outras, futebol feminino)
   const classification = lastTest
-    ? ClassificationService.classify(Number(lastTest.pv_corrigido), athlete)
+    ? ClassificationService.classify(Number(lastTest.pv_corrigido), athlete, lastTest.test.date)
     : null;
 
   // Chart data — barras para cada teste + linha da média
@@ -261,7 +261,7 @@ export default function AthleteProfile() {
           position: athlete.position,
         },
         tests.map(test => {
-          const cl = ClassificationService.classify(Number(test.pv_corrigido), athlete);
+          const cl = ClassificationService.classify(Number(test.pv_corrigido), athlete, test.test.date);
           return {
             date: test.test.date,
             protocolLevel: test.test.protocol_level,
@@ -495,7 +495,7 @@ export default function AthleteProfile() {
           ) : (
             <div className="space-y-2">
               {tests.map((test, index) => {
-                const testClassification = ClassificationService.classify(Number(test.pv_corrigido), athlete);
+                const testClassification = ClassificationService.classify(Number(test.pv_corrigido), athlete, test.test.date);
                 const fc = test.fc_final ?? test.fc_estimada;
 
                 return (

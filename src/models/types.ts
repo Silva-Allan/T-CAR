@@ -202,19 +202,36 @@ export function positionsForSport(sport?: string | null): readonly string[] {
   return [];
 }
 
-export function calculateAge(birthDate: string): number {
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+/**
+ * "YYYY-MM-DD" vira meia-noite LOCAL. `new Date('2011-03-01')` seria meia-noite
+ * UTC, que no Brasil cai no dia anterior e erra a idade no dia do aniversário.
+ */
+function toLocalDate(value: string | Date): Date {
+  if (value instanceof Date) return value;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
+}
+
+/** Idade na data de referência (padrão: hoje) */
+export function calculateAge(birthDate: string, referenceDate: string | Date = new Date()): number {
+  const ref = toLocalDate(referenceDate);
+  const birth = toLocalDate(birthDate);
+  let age = ref.getFullYear() - birth.getFullYear();
+  const monthDiff = ref.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && ref.getDate() < birth.getDate())) {
     age--;
   }
   return age;
 }
 
-export function calculateCategory(birthDate: string): string {
-  const age = calculateAge(birthDate);
+export const CATEGORIES = ['Sub-11', 'Sub-13', 'Sub-15', 'Sub-17', 'Sub-20', 'Profissional'] as const;
+
+/**
+ * Categoria pela idade na data de referência. Nos relatórios a referência é
+ * a data do teste: quem foi testado como Sub-15 continua Sub-15 naquele teste.
+ */
+export function calculateCategory(birthDate: string, referenceDate: string | Date = new Date()): string {
+  const age = calculateAge(birthDate, referenceDate);
   if (age <= 11) return 'Sub-11';
   if (age <= 13) return 'Sub-13';
   if (age <= 15) return 'Sub-15';

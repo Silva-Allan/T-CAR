@@ -10,7 +10,7 @@
 // Não depende de UI nem de Supabase — recebe dados normalizados.
 // ======================================================================
 
-import { Athlete, AthleteResult, PVClassification, SPORTS, Sport, calculateCategory, normalizeSport } from '@/models/types';
+import { Athlete, AthleteResult, CATEGORIES, PVClassification, SPORTS, Sport, calculateCategory, normalizeSport } from '@/models/types';
 import { ClassificationService, RANKING_GROUPS, RankingGroup } from '@/services/ClassificationService';
 
 export interface ReportResult {
@@ -53,6 +53,8 @@ export interface ReportGroupInput {
   key: string;
   label: string;
   testIds: string[];
+  /** Recorte próprio do grupo (avaliação salva com filtros) */
+  filters?: ReportFilters | null;
 }
 
 export interface ReportGroup {
@@ -135,10 +137,14 @@ export interface MergedReport {
   period: { start: string; end: string } | null;
 }
 
+export type Gender = 'M' | 'F' | 'Outro';
+export const GENDERS: Gender[] = ['M', 'F', 'Outro'];
+
 export interface ReportFilters {
   team?: string | null;
   category?: string | null;
   sport?: Sport | null;
+  gender?: Gender | null;
 }
 
 const pad = (n: number) => n.toString().padStart(2, '0');
@@ -178,7 +184,8 @@ class MergeServiceClass {
         athleteName: r.athlete_name,
         team: athlete?.team || null,
         birthDate: athlete?.birth_date || null,
-        category: athlete?.birth_date ? calculateCategory(athlete.birth_date) : null,
+        // Categoria pela idade NA DATA DO TESTE (não a de hoje)
+        category: athlete?.birth_date ? calculateCategory(athlete.birth_date, day) : null,
         position: athlete?.position || null,
         sport: normalizeSport(athlete?.sport),
         gender: athlete?.gender || null,
@@ -232,7 +239,7 @@ class MergeServiceClass {
           athleteName: ar.athleteName,
           team: athlete?.team || null,
           birthDate,
-          category: birthDate ? calculateCategory(birthDate) : null,
+          category: birthDate ? calculateCategory(birthDate, day) : null,
           position: athlete?.position || null,
           sport: normalizeSport(athlete?.sport),
           gender: athlete?.gender || null,
@@ -268,37 +275,60 @@ class MergeServiceClass {
     }));
   }
 
-  /** Valores distintos de equipe e categoria, para montar os filtros */
-  filterOptions(tests: ReportTest[]): { teams: string[]; categories: string[]; sports: Sport[] } {
+  /** Valores presentes nos dados, para montar os filtros */
+  filterOptions(tests: ReportTest[]): { teams: string[]; categories: string[]; sports: Sport[]; genders: Gender[] } {
     const teams = new Set<string>();
     const categories = new Set<string>();
     const sports = new Set<Sport>();
+    const genders = new Set<string>();
     for (const test of tests) {
       for (const r of test.results) {
         if (r.team) teams.add(r.team);
         if (r.category) categories.add(r.category);
         sports.add(r.sport);
+        if (r.gender) genders.add(r.gender);
       }
     }
     return {
       teams: Array.from(teams).sort((a, b) => a.localeCompare(b)),
-      categories: Array.from(categories).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+      categories: CATEGORIES.filter(c => categories.has(c)),
       sports: SPORTS.filter(s => sports.has(s)),
+      genders: GENDERS.filter(g => genders.has(g)),
     };
   }
 
+  hasFilters(filters?: ReportFilters | null): boolean {
+    return !!(filters && (filters.team || filters.category || filters.sport || filters.gender));
+  }
+
+  matches(r: ReportResult, filters?: ReportFilters | null): boolean {
+    if (!filters) return true;
+    return (!filters.team || r.team === filters.team) &&
+      (!filters.category || r.category === filters.category) &&
+      (!filters.sport || r.sport === filters.sport) &&
+      (!filters.gender || r.gender === filters.gender);
+  }
+
+  /**
+   * Mantém só os resultados que batem com os filtros. Baterias que ficam
+   * vazias continuam na lista para não mudar a numeração (Bateria 1, 2, 3
+   * do dia); o `merge` as descarta depois de numerar.
+   */
   applyFilters(tests: ReportTest[], filters: ReportFilters): ReportTest[] {
-    if (!filters.team && !filters.category && !filters.sport) return tests;
-    return tests
-      .map(test => ({
-        ...test,
-        results: test.results.filter(r =>
-          (!filters.team || r.team === filters.team) &&
-          (!filters.category || r.category === filters.category) &&
-          (!filters.sport || r.sport === filters.sport)
-        ),
-      }))
-      .filter(test => test.results.length > 0);
+    if (!this.hasFilters(filters)) return tests;
+    return tests.map(test => ({ ...test, results: test.results.filter(r => this.matches(r, filters)) }));
+  }
+
+  /** Quantos atletas e baterias sobram com esses filtros (prévia antes de gerar) */
+  countMatches(tests: ReportTest[], filters: ReportFilters): { athletes: number; batteries: number } {
+    const athletes = new Set<string>();
+    let batteries = 0;
+    for (const test of tests) {
+      const hits = test.results.filter(r => this.matches(r, filters));
+      if (hits.length) batteries++;
+      hits.forEach(r => athletes.add(r.athleteId));
+    }
+    return { athletes: athletes.size, batteries };
   }
 
   // ====================================================================
@@ -312,11 +342,19 @@ class MergeServiceClass {
     const assigned = new Set<string>();
     const groupsWithTests = groupInputs
       .map(g => {
-        const groupTests = g.testIds
+        const allTests = g.testIds
           .filter(id => testById.has(id) && !assigned.has(id))
           .map(id => testById.get(id)!)
           .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-        groupTests.forEach(t => assigned.add(t.id));
+        allTests.forEach(t => assigned.add(t.id));
+        // Número real da bateria no grupo, antes de qualquer filtro
+        const groupTests = allTests
+          .map((test, i) => ({
+            ...test,
+            batteryNumber: i + 1,
+            results: test.results.filter(r => this.matches(r, g.filters)),
+          }))
+          .filter(test => test.results.length > 0);
         return { input: g, tests: groupTests };
       })
       .filter(g => g.tests.length > 0)
@@ -328,11 +366,11 @@ class MergeServiceClass {
 
     groupsWithTests.forEach(({ input, tests: groupTests }, groupIndex) => {
       const athleteIds = new Set<string>();
-      groupTests.forEach((test, i) => {
+      groupTests.forEach(test => {
         batteries.push({
           testId: test.id,
           groupKey: input.key,
-          number: i + 1,
+          number: test.batteryNumber,
           day: test.day,
           time: test.time,
           protocolLevel: test.protocolLevel,
@@ -349,7 +387,7 @@ class MergeServiceClass {
             groupIndex,
             day: test.day,
             time: test.time,
-            batteryNumber: i + 1,
+            batteryNumber: test.batteryNumber,
             protocolLevel: test.protocolLevel,
           });
         }
@@ -418,7 +456,7 @@ class MergeServiceClass {
         const classification = classified
           ? ClassificationService.classify(best.pvCorrigido, {
             birth_date: best.birthDate, position: best.position, sport: best.sport, gender: best.gender,
-          })
+          }, best.day)
           : null;
         return { position: 0, row: best, repeated: inLastGroup.length > 1, classification };
       })

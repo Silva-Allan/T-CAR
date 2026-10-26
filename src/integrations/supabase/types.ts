@@ -201,6 +201,7 @@ export type Database = {
           user_id: string
           name: string
           notes: string | null
+          filters: Json | null
           created_at: string
           updated_at: string
         }
@@ -209,6 +210,7 @@ export type Database = {
           user_id: string
           name: string
           notes?: string | null
+          filters?: Json | null
           created_at?: string
           updated_at?: string
         }
@@ -217,6 +219,7 @@ export type Database = {
           user_id?: string
           name?: string
           notes?: string | null
+          filters?: Json | null
           created_at?: string
           updated_at?: string
         }

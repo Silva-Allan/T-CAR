@@ -91,13 +91,16 @@ class ClassificationServiceClass {
         return this.rankingGroup(athlete) === 'football';
     }
 
-    /** Classificação pela tabela, ou null quando o atleta não tem tabela de referência */
-    classify(pvCorrigido: number, athlete?: AthleteRef | null): PVClassification | null {
+    /**
+     * Classificação pela tabela, ou null quando o atleta não tem tabela de referência.
+     * `testDate` define a categoria (idade na data do teste); padrão: hoje.
+     */
+    classify(pvCorrigido: number, athlete?: AthleteRef | null, testDate?: string | Date): PVClassification | null {
         if (!this.hasReferenceTable(athlete)) return null;
         return this.getClassification(1, pvCorrigido, {
             birth_date: athlete?.birth_date ?? athlete?.birthDate ?? undefined,
             position: athlete?.position ?? undefined,
-        });
+        }, testDate);
     }
 
     /**
@@ -106,11 +109,12 @@ class ClassificationServiceClass {
     getClassification(
         level: number, // Mantido por assinatura, mas a nova regra usa PV absoluto corrigido
         pvCorrigido: number,
-        athlete?: { birth_date?: string; birthDate?: string; position?: string }
+        athlete?: { birth_date?: string; birthDate?: string; position?: string },
+        testDate?: string | Date
     ): PVClassification {
-        // 1. Identificar Categoria
+        // 1. Identificar Categoria (idade na data do teste)
         const bDate = athlete?.birth_date || athlete?.birthDate;
-        const category = bDate ? calculateCategory(bDate) : 'Profissional'; // Default profissional se sem data
+        const category = bDate ? calculateCategory(bDate, testDate) : 'Profissional'; // Default profissional se sem data
 
         // 2. Identificar Posição (Normalizar chaves)
         let position = athlete?.position || 'midfielder';

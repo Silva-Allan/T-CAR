@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Calendar, Gauge, Clock, ChevronDown, ChevronUp, Users, ExternalLink, Loader2, Layers, Check, X, CheckSquare } from 'lucide-react';
+import { Trash2, Calendar, Gauge, Clock, ChevronDown, ChevronUp, Users, ExternalLink, Loader2, Layers, Check, X, CheckSquare, FileBarChart } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -205,6 +205,17 @@ export default function History() {
             className="pl-9 bg-background/50"
           />
         </div>
+
+        {!selecting && (
+          <button
+            type="button"
+            onClick={() => navigate('/reports/new')}
+            className="mb-4 w-full flex items-center gap-2 text-sm text-primary font-medium hover:underline"
+          >
+            <FileBarChart className="w-4 h-4" />
+            {t('generateReportByFilters')}
+          </button>
+        )}
 
         {selecting && tests.length > 0 && (
           <div className="mb-3 flex items-center justify-between gap-2">

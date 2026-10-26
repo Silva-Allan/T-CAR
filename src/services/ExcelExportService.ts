@@ -45,7 +45,7 @@ class ExcelExportServiceClass {
     report: MergedReport,
     t: T,
     fileName: string,
-    options: { title?: string | null; kind?: 'battery' | 'merged' } = {}
+    options: { title?: string | null; kind?: 'battery' | 'merged'; filtersText?: string | null } = {}
   ): Promise<void> {
     try {
       const title = options.title || (options.kind === 'battery' ? t('reportTest') : t('mergedReportTitle'));
@@ -56,8 +56,11 @@ class ExcelExportServiceClass {
       if (report.groups.length > 1) sheets.push(this.comparisonSheet(report, t));
       sheets.push(this.batteriesSheet(report, t));
 
-      const context = [this.periodText(report, t), `${report.stats.athletes} ${t('athletesPlural')}`]
-        .filter(Boolean).join(' · ');
+      const context = [
+        options.filtersText ? `${t('filtersLabel')} ${options.filtersText}` : null,
+        this.periodText(report, t),
+        `${report.stats.athletes} ${t('athletesPlural')}`,
+      ].filter(Boolean).join(' · ');
       await this.write(sheets, { title, context }, t, fileName);
     } catch (error) {
       Logger.error('Erro ao gerar Excel:', error);

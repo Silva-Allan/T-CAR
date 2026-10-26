@@ -24,13 +24,15 @@ import { SupabaseService } from '@/services/SupabaseService';
 import { SyncService } from '@/services/SyncService';
 import { ExportService } from '@/services/ExportService';
 import { ExcelExportService } from '@/services/ExcelExportService';
-import { MergeService } from '@/services/MergeService';
+import { MergeService, type ReportFilters } from '@/services/MergeService';
 import { useAuth } from '@/hooks/useAuth';
 import { useApp } from '@/store/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AthleteResult } from '@/models/types';
-import { cn, ordinal } from '@/lib/utils';
+import { cn, fileSlug, ordinal } from '@/lib/utils';
+import { describeFilters } from '@/lib/reportFilters';
+import { ReportFiltersBar } from '@/components/ReportFiltersBar';
 import { Logger } from '@/utils/Logger';
 import {
   AlertDialog,
@@ -59,6 +61,7 @@ export default function Results() {
   const [trainerProfile, setTrainerProfile] = useState<any>(null);
   const [expandedAthlete, setExpandedAthlete] = useState<string | null>(null);
   const [pendingNav, setPendingNav] = useState<string | null>(null);
+  const [reportFilters, setReportFilters] = useState<ReportFilters>({});
 
   useEffect(() => {
     if (user) {
@@ -273,15 +276,22 @@ export default function Results() {
     selectedAthletes
   );
   const locale = lang === 'en' ? 'en-US' : (lang as string) === 'es' ? 'es-ES' : 'pt-BR';
-  const report = MergeService.merge([reportTest], [{
+  const filterOptions = MergeService.filterOptions([reportTest]);
+  const report = MergeService.merge(MergeService.applyFilters([reportTest], reportFilters), [{
     key: reportTest.day,
     label: new Date(`${reportTest.day}T12:00:00`).toLocaleDateString(locale),
     testIds: [reportTest.id],
   }]);
+  const filtersText = describeFilters(reportFilters, t);
+  const fileSuffix = filtersText ? `_${fileSlug(filtersText)}` : '';
 
   const handleExportExcel = async () => {
     try {
-      await ExcelExportService.exportReport(report, t, `tcar_teste_${reportTest.day}.xlsx`, { kind: 'battery' });
+      await ExcelExportService.exportReport(report, t, `tcar_teste_${reportTest.day}${fileSuffix}.xlsx`, {
+        kind: 'battery',
+        title: filtersText ? `${t('reportTest')} · ${filtersText}` : null,
+        filtersText,
+      });
     } catch (error) {
       toast({ variant: 'destructive', title: t('excelExportError') });
     }
@@ -291,8 +301,10 @@ export default function Results() {
     try {
       await ExportService.exportMergedReportToPDF(report, t, lang, {
         kind: 'battery',
+        title: filtersText,
         team: trainerProfile?.club || null,
-        fileName: `tcar_teste_${reportTest.day}.pdf`,
+        fileName: `tcar_teste_${reportTest.day}${fileSuffix}.pdf`,
+        filtersText,
       });
     } catch (error) {
       toast({
@@ -364,6 +376,11 @@ export default function Results() {
             <h3 className="font-semibold">{t('rankingResults')}</h3>
           </div>
           <p className="text-xs text-muted-foreground">{t('rankingByPVCorrigido')}</p>
+
+          <ReportFiltersBar options={filterOptions} value={reportFilters} onChange={setReportFilters} t={t} idPrefix="results" />
+          {report.rows.length === 0 && (
+            <p className="text-center text-muted-foreground py-6">{t('mergedNoResultsForFilter')}</p>
+          )}
 
           {report.sections.map(section => (
           <div key={`${section.group}-${section.level}`} className="space-y-3">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Clock, Gauge, Trophy, Ruler, Heart, Calendar, Loader2, FileText, FileSpreadsheet } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -8,10 +8,12 @@ import { CalculatorService } from '@/services/CalculatorService';
 import { SupabaseService } from '@/services/SupabaseService';
 import { ExportService } from '@/services/ExportService';
 import { ExcelExportService } from '@/services/ExcelExportService';
-import { MergeService, MergedReport, ReportTest } from '@/services/MergeService';
+import { MergeService, ReportFilters, ReportTest } from '@/services/MergeService';
+import { ReportFiltersBar } from '@/components/ReportFiltersBar';
+import { describeFilters } from '@/lib/reportFilters';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
-import { ordinal } from '@/lib/utils';
+import { fileSlug, ordinal } from '@/lib/utils';
 import { Logger } from '@/utils/Logger';
 
 export default function TestDetails() {
@@ -20,7 +22,7 @@ export default function TestDetails() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [test, setTest] = useState<ReportTest | null>(null);
-  const [report, setReport] = useState<MergedReport | null>(null);
+  const [filters, setFilters] = useState<ReportFilters>({});
   const [loading, setLoading] = useState(true);
   const [trainerProfile, setTrainerProfile] = useState<any>(null);
   const [exporting, setExporting] = useState(false);
@@ -43,15 +45,7 @@ export default function TestDetails() {
           SupabaseService.getTestsForReport([id]),
           SupabaseService.getProfile()
         ]);
-        if (rows[0]) {
-          const reportTest = MergeService.fromSupabase(rows[0]);
-          setTest(reportTest);
-          setReport(MergeService.merge([reportTest], [{
-            key: reportTest.day,
-            label: formatDay(reportTest.day),
-            testIds: [reportTest.id],
-          }]));
-        }
+        if (rows[0]) setTest(MergeService.fromSupabase(rows[0]));
         setTrainerProfile(profileData);
       } catch (error) {
         Logger.error('Error loading test:', error);
@@ -61,8 +55,22 @@ export default function TestDetails() {
     };
 
     loadTest();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, user, navigate]);
+
+  // Relatório da bateria com o recorte escolhido (ex.: só as meninas)
+  const filterOptions = useMemo(() => MergeService.filterOptions(test ? [test] : []), [test]);
+  const report = useMemo(() => test
+    ? MergeService.merge(MergeService.applyFilters([test], filters), [{
+      key: test.day,
+      label: formatDay(test.day),
+      testIds: [test.id],
+    }])
+    : null,
+  // formatDay depende só do idioma
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [test, filters, lang]);
+  const filtersText = describeFilters(filters, t);
+  const fileSuffix = filtersText ? `_${fileSlug(filtersText)}` : '';
 
   const handleExportPDF = async () => {
     if (!test || !report) return;
@@ -70,8 +78,10 @@ export default function TestDetails() {
     try {
       await ExportService.exportMergedReportToPDF(report, t, lang as string, {
         kind: 'battery',
+        title: filtersText,
         team: trainerProfile?.club || null,
-        fileName: `tcar_teste_${test.day}.pdf`,
+        fileName: `tcar_teste_${test.day}${fileSuffix}.pdf`,
+        filtersText,
       });
     } catch (error) {
       Logger.error('Erro ao exportar PDF:', error);
@@ -84,7 +94,11 @@ export default function TestDetails() {
     if (!test || !report) return;
     setExportingExcel(true);
     try {
-      await ExcelExportService.exportReport(report, t, `tcar_teste_${test.day}.xlsx`, { kind: 'battery' });
+      await ExcelExportService.exportReport(report, t, `tcar_teste_${test.day}${fileSuffix}.xlsx`, {
+        kind: 'battery',
+        title: filtersText ? `${t('reportTest')} · ${filtersText}` : null,
+        filtersText,
+      });
     } catch (error) {
       Logger.error('Erro ao exportar Excel:', error);
     } finally {
@@ -176,6 +190,11 @@ export default function TestDetails() {
         {/* Athletes Results — um ranking por modalidade */}
         <div className="space-y-3">
           <h3 className="font-semibold">{t('resultsByAthlete')}</h3>
+
+          <ReportFiltersBar options={filterOptions} value={filters} onChange={setFilters} t={t} idPrefix="test" />
+          {report.rows.length === 0 && (
+            <p className="text-center text-muted-foreground py-6">{t('mergedNoResultsForFilter')}</p>
+          )}
 
           {report.sections.map(section => (
             <div key={`${section.group}-${section.level}`} className="space-y-3">
